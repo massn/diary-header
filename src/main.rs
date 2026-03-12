@@ -1,5 +1,5 @@
 use chrono::{DateTime, Local, NaiveDate};
-use inquire::{Confirm, Text};
+use inquire::{Confirm, DateSelect, Text};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -90,7 +90,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if create_header {
         let now = Local::now();
-        let today = now.date_naive();
+        
+        let today = DateSelect::new("Select date for diary header:")
+            .with_default(now.date_naive())
+            .prompt()?;
         
         // Fetch Geo Info
         let geo = fetch_geo_info().unwrap_or(GeoInfo {
@@ -112,7 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let eto = get_sexagenary_cycle(today);
 
         // Format Header
-        let date_str = now.format("%Y-%m-%d (%A)").to_string();
+        let date_str = today.format("%Y-%m-%d (%A)").to_string();
         let time_suffix = if geo.timezone == "Asia/Tokyo" { "JST" } else { "" };
         let time_format = format!("%H:%M:%S {}%z", time_suffix);
 
