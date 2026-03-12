@@ -1,8 +1,10 @@
 use chrono::{DateTime, Local, NaiveDate};
 use inquire::{DateSelect, Select, Text};
+use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
+use std::path::PathBuf;
 use tzf_rs::DefaultFinder;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -10,6 +12,19 @@ struct Config {
     title_prefix: String,
     author: String,
     tags: String,
+}
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Update configuration
+    Config,
 }
 
 #[derive(Deserialize, Debug)]
@@ -62,8 +77,21 @@ impl fmt::Display for LocationChoice {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Locate or create config directory
+fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
+    let title_prefix = Text::new("Enter the prefix for the diary title (e.g., 'Diary - '):")
+        .with_default("Diary - ")
+        .prompt()?;
+    let author = Text::new("Enter the author name:").prompt()?;
+    let tags = Text::new("Enter default tags separated by commas (e.g., 'diary,tech'):").prompt()?;
+
+    Ok(Config {
+        title_prefix,
+        author,
+        tags,
+    })
+}
+
+fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let config_dir = dirs::config_dir()
         .ok_or("Could not find config directory")?
         .join("diary-header");
@@ -72,7 +100,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir_all(&config_dir)?;
     }
 
-    let config_path = config_dir.join("config.toml");
+    Ok(config_dir.join("config.toml"))
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
+    let config_path = get_config_path()?;
+
+    match &cli.command {
+        Some(Commands::Config) => {
+            println!("Updating configuration...");
+            let new_config = prompt_for_config()?;
+            let toml_string = toml::to_string(&new_config)?;
+            fs::write(&config_path, toml_string)?;
+            println!("Configuration updated and saved to: {}", config_path.display());
+            return Ok(());
+        }
+        None => {}
+    }
 
     // 2. Check if TOML config file exists
     let _config = if config_path.exists() {
@@ -81,18 +126,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("Configuration file not found. Starting initial setup.");
         // 3. Prompt interactive setup
-        let title_prefix = Text::new("Enter the prefix for the diary title (e.g., 'Diary - '):")
-            .with_default("Diary - ")
-            .prompt()?;
-        let author = Text::new("Enter the author name:").prompt()?;
-        let tags =
-            Text::new("Enter default tags separated by commas (e.g., 'diary,tech'):").prompt()?;
-
-        let new_config = Config {
-            title_prefix,
-            author,
-            tags,
-        };
+        let new_config = prompt_for_config()?;
 
         let toml_string = toml::to_string(&new_config)?;
         fs::write(&config_path, toml_string)?;
