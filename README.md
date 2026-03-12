@@ -9,7 +9,8 @@ A command-line tool written in Rust that interactively generates a Markdown head
 - **Manual Location Selection**: Optionally select from a comprehensive list of cities worldwide if you are writing a diary for somewhere else.
 - **Astronomical Calculations**: Calculates precise sunrise and sunset times based on the selected date and location coordinates.
 - **Sexagenary Cycle (干支)**: Automatically computes the traditional continuous calendar cycle (Eto) for the given date.
-- **Persistent Configuration**: Prompts for an initial configuration (title prefix, author, tags) and saves it to a configuration file (`~/.config/diary-header/config.toml`).
+- **Language Configuration**: Choose between Japanese (ja) and English (en) for the output format.
+- **Persistent Configuration**: Prompts for an initial configuration (language) and saves it to a configuration file (`~/.config/diary-header/config.toml`). You can update this later using the `config` subcommand.
 
 ## Installation
 
@@ -31,22 +32,34 @@ cargo run
 
 When you run `diary-header` (or `cargo run`), the tool will interactively prompt you for the necessary information:
 
-1. **First-time Setup**: If the configuration file does not exist, it will ask for a diary title prefix, author name, and default tags. This is saved to `~/.config/diary-header/config.toml`.
+1. **First-time Setup**: If the configuration file does not exist, it will ask for your preferred output language (Japanese or English). This is saved to `~/.config/diary-header/config.toml`.
 2. **Date Selection**: Prompts you to select a date for the diary header (defaults to today).
 3. **Location Selection**: Prompts you to choose "Current Location (Auto via IP)" or select a specific city from the list.
 
 ### Example Output
 
-Once the selections are made, the tool outputs a localized Markdown header:
+Once the selections are made, the tool outputs a localized Markdown header depending on your configured language:
 
+**Japanese Output (`ja`):**
 ```markdown
-## 2024-11-20 (Wednesday)
+## 2024-11-20 (水)
 - 場所 (Current IP Address): Tokyo (Tokyo)
 - 緯度経度: (35.6895, 139.6917)
 - タイムゾーン: Asia/Tokyo
 - 日の出: 06:21:43 JST+0900
 - 日の入り: 16:32:11 JST+0900
 - 干支: 甲辰
+```
+
+**English Output (`en`):**
+```markdown
+## 2024-11-20 (Wednesday)
+- Location (Current IP Address): Tokyo (Tokyo)
+- Lat/Lon: (35.6895, 139.6917)
+- Timezone: Asia/Tokyo
+- Sunrise: 06:21:43 JST+0900
+- Sunset: 16:32:11 JST+0900
+- Sexagenary Cycle: 甲辰
 ```
 
 You can redirect this output directly to your diary file or copy it securely:
@@ -57,12 +70,18 @@ diary-header >> my-diary.md
 
 ## Configuration
 
-The configuration file is stored in `~/.config/diary-header/config.toml` (macOS/Linux) or `%APPDATA%\diary-header\config.toml` (Windows). It looks like this:
+The configuration file is stored in `~/.config/diary-header/config.toml` (macOS/Linux) or `%APPDATA%\diary-header\config.toml` (Windows). It only contains the language setting as of the current version:
 
 ```toml
-title_prefix = "Diary - "
-author = "Your Name"
-tags = "diary,tech"
+language = "en"
+```
+
+You can interactively change the language setting at any time by using the `config` subcommand:
+
+```bash
+diary-header config
+# Or with cargo:
+cargo run -- config
 ```
 
 ## Dependencies
@@ -73,6 +92,7 @@ tags = "diary,tech"
 - **[tzf-rs](https://crates.io/crates/tzf-rs)**: For fast offline timezone timezone lookups based on longitude and latitude.
 - **[chrono](https://crates.io/crates/chrono)**: For date and time manipulation.
 - **[cities](https://crates.io/crates/cities)**: For the embedded list of global cities.
+- **[clap](https://crates.io/crates/clap)**: For CLI argument parsing and subcommands.
 - **[serde](https://crates.io/crates/serde) / [serde_json](https://crates.io/crates/serde_json) / [toml](https://crates.io/crates/toml)**: For data serialization and writing/reading the config.
 
 ## License
