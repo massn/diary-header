@@ -1,7 +1,9 @@
 use chrono::{DateTime, Local, NaiveDate};
-use inquire::{DateSelect, Text};
+use inquire::{DateSelect, Select, Text};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::fs;
+use tzf_rs::DefaultFinder;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
@@ -44,6 +46,20 @@ fn get_sexagenary_cycle(date: NaiveDate) -> String {
     let branch_idx = ((diff % 12 + 12) % 12) as usize;
 
     format!("{}{}", stems[stem_idx], branches[branch_idx])
+}
+
+#[derive(Clone)]
+struct LocationChoice {
+    name: String,
+    is_auto: bool,
+    lat: f64,
+    lon: f64,
+}
+
+impl fmt::Display for LocationChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -91,15 +107,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_default(now.date_naive())
         .prompt()?;
 
-    // Fetch Geo Info
-    let geo = fetch_geo_info().unwrap_or(GeoInfo {
-        status: "fail".to_string(),
-        city: "Unknown".to_string(),
-        region_name: "Unknown".to_string(),
+    let mut locations = vec![LocationChoice {
+        name: "Current Location (Auto via IP)".to_string(),
+        is_auto: true,
         lat: 0.0,
         lon: 0.0,
-        timezone: "UTC".to_string(),
-    });
+    }];
+
+    for city in cities::all() {
+        locations.push(LocationChoice {
+            name: format!("{}, {}", city.city, city.country),
+            is_auto: false,
+            lat: city.latitude,
+            lon: city.longitude,
+        });
+    }
+
+    let selected_loc = Select::new("Select location:", locations).prompt()?;
+
+    // Fetch Geo Info
+    let geo = if selected_loc.is_auto {
+        fetch_geo_info().unwrap_or(GeoInfo {
+            status: "fail".to_string(),
+            city: "Unknown".to_string(),
+            region_name: "Unknown".to_string(),
+            lat: 0.0,
+            lon: 0.0,
+            timezone: "UTC".to_string(),
+        })
+    } else {
+        let finder = DefaultFinder::new();
+        let tz_name = finder.get_tz_name(selected_loc.lon, selected_loc.lat);
+
+        let parts: Vec<&str> = selected_loc.name.split(", ").collect();
+        let city = parts
+            .first()
+            .unwrap_or(&selected_loc.name.as_str())
+            .to_string();
+
+        GeoInfo {
+            status: "success".to_string(),
+            city,
+            region_name: selected_loc.name.clone(),
+            lat: selected_loc.lat,
+            lon: selected_loc.lon,
+            timezone: tz_name.to_string(),
+        }
+    };
 
     // Calculate Sunrise/Sunset
     let coord = sunrise::Coordinates::new(geo.lat, geo.lon).unwrap();
