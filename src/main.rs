@@ -1,5 +1,5 @@
 use chrono::{DateTime, Local, NaiveDate};
-use inquire::{Confirm, DateSelect, Text};
+use inquire::{DateSelect, Text};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -31,11 +31,13 @@ fn fetch_geo_info() -> Result<GeoInfo, Box<dyn std::error::Error>> {
 
 fn get_sexagenary_cycle(date: NaiveDate) -> String {
     let stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"];
-    let branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+    let branches = [
+        "子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥",
+    ];
 
     let anchor = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let diff = date.signed_duration_since(anchor).num_days();
-    
+
     // Handle negative diff if needed, but for future dates it's positive.
     // (diff % 10 + 10) % 10 ensures positive index.
     let stem_idx = ((diff % 10 + 10) % 10) as usize;
@@ -83,63 +85,64 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         new_config
     };
 
-    let create_header = Confirm::new("Do you want to create today's header?")
-        .with_default(true)
-        .prompt()
-        .unwrap_or(true);
+    let now = Local::now();
 
-    if create_header {
-        let now = Local::now();
-        
-        let today = DateSelect::new("Select date for diary header:")
-            .with_default(now.date_naive())
-            .prompt()?;
-        
-        // Fetch Geo Info
-        let geo = fetch_geo_info().unwrap_or(GeoInfo {
-            status: "fail".to_string(),
-            city: "Unknown".to_string(),
-            region_name: "Unknown".to_string(),
-            lat: 0.0,
-            lon: 0.0,
-            timezone: "UTC".to_string(),
-        });
+    let today = DateSelect::new("Select date for diary header:")
+        .with_default(now.date_naive())
+        .prompt()?;
 
-        // Calculate Sunrise/Sunset
-        let coord = sunrise::Coordinates::new(geo.lat, geo.lon).unwrap();
-        let solar_day = sunrise::SolarDay::new(coord, today);
-        let sunrise_dt: DateTime<Local> = solar_day.event_time(sunrise::SolarEvent::Sunrise).with_timezone(&Local);
-        let sunset_dt: DateTime<Local> = solar_day.event_time(sunrise::SolarEvent::Sunset).with_timezone(&Local);
+    // Fetch Geo Info
+    let geo = fetch_geo_info().unwrap_or(GeoInfo {
+        status: "fail".to_string(),
+        city: "Unknown".to_string(),
+        region_name: "Unknown".to_string(),
+        lat: 0.0,
+        lon: 0.0,
+        timezone: "UTC".to_string(),
+    });
 
-        // Calculate Sexagenary Cycle
-        let eto = get_sexagenary_cycle(today);
+    // Calculate Sunrise/Sunset
+    let coord = sunrise::Coordinates::new(geo.lat, geo.lon).unwrap();
+    let solar_day = sunrise::SolarDay::new(coord, today);
+    let sunrise_dt: DateTime<Local> = solar_day
+        .event_time(sunrise::SolarEvent::Sunrise)
+        .with_timezone(&Local);
+    let sunset_dt: DateTime<Local> = solar_day
+        .event_time(sunrise::SolarEvent::Sunset)
+        .with_timezone(&Local);
 
-        // Format Header
-        let date_str = today.format("%Y-%m-%d (%A)").to_string();
-        let time_suffix = if geo.timezone == "Asia/Tokyo" { "JST" } else { "" };
-        let time_format = format!("%H:%M:%S {}%z", time_suffix);
+    // Calculate Sexagenary Cycle
+    let eto = get_sexagenary_cycle(today);
 
-        let header = format!(
-            "## {}\n\
+    // Format Header
+    let date_str = today.format("%Y-%m-%d (%A)").to_string();
+    let time_suffix = if geo.timezone == "Asia/Tokyo" {
+        "JST"
+    } else {
+        ""
+    };
+    let time_format = format!("%H:%M:%S {}%z", time_suffix);
+
+    let header = format!(
+        "## {}\n\
              - 場所 (Current IP Address): {} ({})\n\
              - 緯度経度: ({:.4}, {:.4})\n\
              - タイムゾーン: {}\n\
              - 日の出: {}\n\
              - 日の入り: {}\n\
              - 干支: {}",
-            date_str,
-            geo.city,
-            geo.region_name,
-            geo.lat,
-            geo.lon,
-            geo.timezone,
-            sunrise_dt.format(&time_format),
-            sunset_dt.format(&time_format),
-            eto
-        );
+        date_str,
+        geo.city,
+        geo.region_name,
+        geo.lat,
+        geo.lon,
+        geo.timezone,
+        sunrise_dt.format(&time_format),
+        sunset_dt.format(&time_format),
+        eto
+    );
 
-        println!("{}", header);
-    }
+    println!("{}", header);
 
     Ok(())
 }
