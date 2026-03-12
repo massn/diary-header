@@ -1,5 +1,5 @@
 use chrono::{DateTime, Local, NaiveDate};
-use inquire::{DateSelect, Select, Text};
+use inquire::{DateSelect, Select};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -9,9 +9,7 @@ use tzf_rs::DefaultFinder;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
-    title_prefix: String,
-    author: String,
-    tags: String,
+    language: String,
 }
 
 #[derive(Parser)]
@@ -78,17 +76,19 @@ impl fmt::Display for LocationChoice {
 }
 
 fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
-    let title_prefix = Text::new("Enter the prefix for the diary title (e.g., 'Diary - '):")
-        .with_default("Diary - ")
-        .prompt()?;
-    let author = Text::new("Enter the author name:").prompt()?;
-    let tags = Text::new("Enter default tags separated by commas (e.g., 'diary,tech'):").prompt()?;
+    let language_opt = Select::new(
+        "Select language for the diary header:",
+        vec!["ja (Japanese)", "en (English)"],
+    )
+    .prompt()?;
 
-    Ok(Config {
-        title_prefix,
-        author,
-        tags,
-    })
+    let language = if language_opt.starts_with("en") {
+        "en".to_string()
+    } else {
+        "ja".to_string()
+    };
+
+    Ok(Config { language })
 }
 
 fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
@@ -202,8 +202,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Calculate Sexagenary Cycle
     let eto = get_sexagenary_cycle(today);
 
-    // Format Header
-    let date_str = today.format("%Y-%m-%d (%A)").to_string();
+    use chrono::Datelike;
+    let date_str = if _config.language == "en" {
+        today.format("%Y-%m-%d (%A)").to_string()
+    } else {
+        let wd_jp = match today.weekday() {
+            chrono::Weekday::Mon => "月",
+            chrono::Weekday::Tue => "火",
+            chrono::Weekday::Wed => "水",
+            chrono::Weekday::Thu => "木",
+            chrono::Weekday::Fri => "金",
+            chrono::Weekday::Sat => "土",
+            chrono::Weekday::Sun => "日",
+        };
+        format!("{} ({})", today.format("%Y-%m-%d"), wd_jp)
+    };
+
     let time_suffix = if geo.timezone == "Asia/Tokyo" {
         "JST"
     } else {
@@ -211,24 +225,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let time_format = format!("%H:%M:%S {}%z", time_suffix);
 
-    let header = format!(
-        "## {}\n\
+    let header = if _config.language == "en" {
+        format!(
+            "## {}\n\
+             - Location (Current IP Address): {} ({})\n\
+             - Lat/Lon: ({:.4}, {:.4})\n\
+             - Timezone: {}\n\
+             - Sunrise: {}\n\
+             - Sunset: {}\n\
+             - Sexagenary Cycle: {}",
+            date_str,
+            geo.city,
+            geo.region_name,
+            geo.lat,
+            geo.lon,
+            geo.timezone,
+            sunrise_dt.format(&time_format),
+            sunset_dt.format(&time_format),
+            eto
+        )
+    } else {
+        format!(
+            "## {}\n\
              - 場所 (Current IP Address): {} ({})\n\
              - 緯度経度: ({:.4}, {:.4})\n\
              - タイムゾーン: {}\n\
              - 日の出: {}\n\
              - 日の入り: {}\n\
              - 干支: {}",
-        date_str,
-        geo.city,
-        geo.region_name,
-        geo.lat,
-        geo.lon,
-        geo.timezone,
-        sunrise_dt.format(&time_format),
-        sunset_dt.format(&time_format),
-        eto
-    );
+            date_str,
+            geo.city,
+            geo.region_name,
+            geo.lat,
+            geo.lon,
+            geo.timezone,
+            sunrise_dt.format(&time_format),
+            sunset_dt.format(&time_format),
+            eto
+        )
+    };
 
     println!("{}", header);
 
