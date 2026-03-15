@@ -8,6 +8,7 @@ A command-line tool written in Rust that interactively generates a Markdown head
 - **Location Auto-Detection**: Automatically fetches your current location, latitude, longitude, and timezone based on your IP address.
 - **Manual Location Selection**: Optionally select from a comprehensive list of cities worldwide if you are writing a diary for somewhere else.
 - **Astronomical Calculations**: Calculates precise sunrise and sunset times based on the selected date and location coordinates.
+- **Weather Information**: Retrieves daily maximum and minimum temperatures for the selected date and location.
 - **Sexagenary Cycle (干支)**: Automatically computes the traditional continuous calendar cycle (Eto) for the given date.
 - **Language Configuration**: Choose between Japanese (ja) and English (en) for the output format.
 - **Persistent Configuration**: Prompts for an initial configuration (language) and saves it to a configuration file (`~/.config/diary-header/config.toml`). You can update this later using the `config` subcommand.
@@ -48,6 +49,7 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - タイムゾーン: Asia/Tokyo
 - 日の出: 06:21:43 JST+0900
 - 日の入り: 16:32:11 JST+0900
+- 気温: 最高 18.5°C / 最低 12.3°C
 - 干支: 甲辰
 ```
 
@@ -59,6 +61,7 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - Timezone: Asia/Tokyo
 - Sunrise: 06:21:43 JST+0900
 - Sunset: 16:32:11 JST+0900
+- Temperature: Max 18.5°C / Min 12.3°C
 - Sexagenary Cycle: 甲辰
 ```
 
@@ -87,7 +90,7 @@ cargo run -- config
 ## Dependencies
 
 - **[inquire](https://crates.io/crates/inquire)**: For interactive terminal prompts (date, select, text).
-- **[reqwest](https://crates.io/crates/reqwest)**: For hitting the `ip-api.com` endpoint to fetch IP-based timezone and geolocation info.
+- **[reqwest](https://crates.io/crates/reqwest)**: For hitting the `ip-api.com` endpoint to fetch IP-based timezone and geolocation info, and the Open-Meteo API for weather data.
 - **[sunrise](https://crates.io/crates/sunrise)**: For calculating the exact sunrise and sunset times.
 - **[tzf-rs](https://crates.io/crates/tzf-rs)**: For fast offline timezone timezone lookups based on longitude and latitude.
 - **[chrono](https://crates.io/crates/chrono)**: For date and time manipulation.

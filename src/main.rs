@@ -37,11 +37,37 @@ struct GeoInfo {
     timezone: String,
 }
 
+#[derive(Deserialize, Debug)]
+struct WeatherDaily {
+    temperature_2m_max: Vec<f64>,
+    temperature_2m_min: Vec<f64>,
+}
+
+#[derive(Deserialize, Debug)]
+struct WeatherResponse {
+    daily: WeatherDaily,
+}
+
 const IP_API_URL: &str = "http://ip-api.com/json";
 
 fn fetch_geo_info() -> Result<GeoInfo, Box<dyn std::error::Error>> {
     let resp = reqwest::blocking::get(IP_API_URL)?.json::<GeoInfo>()?;
     Ok(resp)
+}
+
+fn fetch_weather_info(lat: f64, lon: f64, date: NaiveDate) -> Result<(f64, f64), Box<dyn std::error::Error>> {
+    let date_str = date.format("%Y-%m-%d").to_string();
+    let url = format!(
+        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&daily=temperature_2m_max,temperature_2m_min&start_date={}&end_date={}&timezone=auto",
+        lat, lon, date_str, date_str
+    );
+
+    let resp = reqwest::blocking::get(&url)?.json::<WeatherResponse>()?;
+
+    let temp_max = resp.daily.temperature_2m_max.first().copied().unwrap_or(0.0);
+    let temp_min = resp.daily.temperature_2m_min.first().copied().unwrap_or(0.0);
+
+    Ok((temp_max, temp_min))
 }
 
 fn get_sexagenary_cycle(date: NaiveDate) -> String {
@@ -199,6 +225,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .event_time(sunrise::SolarEvent::Sunset)
         .with_timezone(&Local);
 
+    // Fetch Weather Information
+    let (temp_max, temp_min) = fetch_weather_info(geo.lat, geo.lon, today)
+        .unwrap_or((0.0, 0.0));
+
     // Calculate Sexagenary Cycle
     let eto = get_sexagenary_cycle(today);
 
@@ -233,6 +263,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              - Timezone: {}\n\
              - Sunrise: {}\n\
              - Sunset: {}\n\
+             - Temperature: Max {:.1}°C / Min {:.1}°C\n\
              - Sexagenary Cycle: {}",
             date_str,
             geo.city,
@@ -242,6 +273,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             geo.timezone,
             sunrise_dt.format(&time_format),
             sunset_dt.format(&time_format),
+            temp_max,
+            temp_min,
             eto
         )
     } else {
@@ -252,6 +285,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              - タイムゾーン: {}\n\
              - 日の出: {}\n\
              - 日の入り: {}\n\
+             - 気温: 最高 {:.1}°C / 最低 {:.1}°C\n\
              - 干支: {}",
             date_str,
             geo.city,
@@ -261,6 +295,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             geo.timezone,
             sunrise_dt.format(&time_format),
             sunset_dt.format(&time_format),
+            temp_max,
+            temp_min,
             eto
         )
     };
