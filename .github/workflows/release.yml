@@ -71,10 +71,23 @@ jobs:
         with:
           path: artifacts
 
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          for dir in artifacts/*/; do
+            artifact_name=$(basename "$dir")
+            if [ -f "$dir/diary-header.exe" ]; then
+              cp "$dir/diary-header.exe" "release/${artifact_name}.exe"
+            elif [ -f "$dir/diary-header" ]; then
+              cp "$dir/diary-header" "release/${artifact_name}"
+            fi
+          done
+          ls -la release/
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/**/*
+          files: release/*
           draft: false
           prerelease: false
         env:
