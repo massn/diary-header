@@ -1,6 +1,6 @@
 use chrono::{DateTime, Local, NaiveDate};
-use inquire::{DateSelect, Select};
 use clap::{Parser, Subcommand};
+use inquire::{DateSelect, Select};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
@@ -59,23 +59,105 @@ fn fetch_geo_info() -> Result<GeoInfo, Box<dyn std::error::Error>> {
 
 fn get_weather_description(code: i32, lang: &str) -> String {
     match code {
-        0 => if lang == "en" { "Clear sky".to_string() } else { "快晴".to_string() },
-        1 => if lang == "en" { "Mainly clear".to_string() } else { "晴れ".to_string() },
-        2 => if lang == "en" { "Partly cloudy".to_string() } else { "一部曇り".to_string() },
-        3 => if lang == "en" { "Overcast".to_string() } else { "曇り".to_string() },
-        45 | 48 => if lang == "en" { "Fog".to_string() } else { "霧".to_string() },
-        51 | 53 | 55 => if lang == "en" { "Drizzle".to_string() } else { "霧雨".to_string() },
-        61 | 63 | 65 => if lang == "en" { "Rain".to_string() } else { "雨".to_string() },
-        71 | 73 | 75 => if lang == "en" { "Snow".to_string() } else { "雪".to_string() },
-        77 => if lang == "en" { "Snow grains".to_string() } else { "雪あられ".to_string() },
-        80 | 81 | 82 => if lang == "en" { "Rain showers".to_string() } else { "にわか雨".to_string() },
-        85 | 86 => if lang == "en" { "Snow showers".to_string() } else { "にわか雪".to_string() },
-        95 | 96 | 99 => if lang == "en" { "Thunderstorm".to_string() } else { "雷雨".to_string() },
-        _ => if lang == "en" { "Unknown".to_string() } else { "不明".to_string() },
+        0 => {
+            if lang == "en" {
+                "Clear sky".to_string()
+            } else {
+                "快晴".to_string()
+            }
+        }
+        1 => {
+            if lang == "en" {
+                "Mainly clear".to_string()
+            } else {
+                "晴れ".to_string()
+            }
+        }
+        2 => {
+            if lang == "en" {
+                "Partly cloudy".to_string()
+            } else {
+                "一部曇り".to_string()
+            }
+        }
+        3 => {
+            if lang == "en" {
+                "Overcast".to_string()
+            } else {
+                "曇り".to_string()
+            }
+        }
+        45 | 48 => {
+            if lang == "en" {
+                "Fog".to_string()
+            } else {
+                "霧".to_string()
+            }
+        }
+        51 | 53 | 55 => {
+            if lang == "en" {
+                "Drizzle".to_string()
+            } else {
+                "霧雨".to_string()
+            }
+        }
+        61 | 63 | 65 => {
+            if lang == "en" {
+                "Rain".to_string()
+            } else {
+                "雨".to_string()
+            }
+        }
+        71 | 73 | 75 => {
+            if lang == "en" {
+                "Snow".to_string()
+            } else {
+                "雪".to_string()
+            }
+        }
+        77 => {
+            if lang == "en" {
+                "Snow grains".to_string()
+            } else {
+                "雪あられ".to_string()
+            }
+        }
+        80 | 81 | 82 => {
+            if lang == "en" {
+                "Rain showers".to_string()
+            } else {
+                "にわか雨".to_string()
+            }
+        }
+        85 | 86 => {
+            if lang == "en" {
+                "Snow showers".to_string()
+            } else {
+                "にわか雪".to_string()
+            }
+        }
+        95 | 96 | 99 => {
+            if lang == "en" {
+                "Thunderstorm".to_string()
+            } else {
+                "雷雨".to_string()
+            }
+        }
+        _ => {
+            if lang == "en" {
+                "Unknown".to_string()
+            } else {
+                "不明".to_string()
+            }
+        }
     }
 }
 
-fn fetch_weather_info(lat: f64, lon: f64, date: NaiveDate) -> Result<(f64, f64, i32, i32), Box<dyn std::error::Error>> {
+fn fetch_weather_info(
+    lat: f64,
+    lon: f64,
+    date: NaiveDate,
+) -> Result<(f64, f64, i32, i32), Box<dyn std::error::Error>> {
     let date_str = date.format("%Y-%m-%d").to_string();
     let url = format!(
         "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max&start_date={}&end_date={}&timezone=auto",
@@ -84,10 +166,25 @@ fn fetch_weather_info(lat: f64, lon: f64, date: NaiveDate) -> Result<(f64, f64, 
 
     let resp = reqwest::blocking::get(&url)?.json::<WeatherResponse>()?;
 
-    let temp_max = resp.daily.temperature_2m_max.first().copied().unwrap_or(0.0);
-    let temp_min = resp.daily.temperature_2m_min.first().copied().unwrap_or(0.0);
+    let temp_max = resp
+        .daily
+        .temperature_2m_max
+        .first()
+        .copied()
+        .unwrap_or(0.0);
+    let temp_min = resp
+        .daily
+        .temperature_2m_min
+        .first()
+        .copied()
+        .unwrap_or(0.0);
     let weather_code = resp.daily.weather_code.first().copied().unwrap_or(0);
-    let precip_prob = resp.daily.precipitation_probability_max.first().copied().unwrap_or(0);
+    let precip_prob = resp
+        .daily
+        .precipitation_probability_max
+        .first()
+        .copied()
+        .unwrap_or(0);
 
     Ok((temp_max, temp_min, weather_code, precip_prob))
 }
@@ -161,7 +258,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let new_config = prompt_for_config()?;
             let toml_string = toml::to_string(&new_config)?;
             fs::write(&config_path, toml_string)?;
-            println!("Configuration updated and saved to: {}", config_path.display());
+            println!(
+                "Configuration updated and saved to: {}",
+                config_path.display()
+            );
             return Ok(());
         }
         None => {}
@@ -248,8 +348,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_timezone(&Local);
 
     // Fetch Weather Information
-    let (temp_max, temp_min, weather_code, precip_prob) = fetch_weather_info(geo.lat, geo.lon, today)
-        .unwrap_or((0.0, 0.0, 0, 0));
+    let (temp_max, temp_min, weather_code, precip_prob) =
+        fetch_weather_info(geo.lat, geo.lon, today).unwrap_or((0.0, 0.0, 0, 0));
 
     // Calculate Sexagenary Cycle
     let eto = get_sexagenary_cycle(today);
