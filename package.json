@@ -1,0 +1,44 @@
+{
+  "name": "diary-header",
+  "version": "0.1.0",
+  "description": "A command-line tool that generates a Markdown header for daily diary entries with location, astronomical, and weather information",
+  "main": "index.js",
+  "bin": {
+    "diary-header": "./bin/diary-header.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "diary",
+    "markdown",
+    "cli",
+    "calendar",
+    "astronomy",
+    "weather",
+    "journal"
+  ],
+  "author": "massn",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/massn/diary-header.git"
+  },
+  "bugs": {
+    "url": "https://github.com/massn/diary-header/issues"
+  },
+  "homepage": "https://github.com/massn/diary-header#readme",
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=14"
+  }
+}
