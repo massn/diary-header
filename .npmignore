@@ -1,0 +1,30 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# Source files (only include binaries)
+/src/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config files
+gemini_cli_config.json
+
+# Documentation (keep README.md and LICENSE)
+*.md
+!README.md
+
+# GitHub
+.github/
