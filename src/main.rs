@@ -122,7 +122,7 @@ fn get_weather_description(code: i32, lang: &str) -> String {
                 "雪あられ".to_string()
             }
         }
-        80 | 81 | 82 => {
+        80..=82 => {
             if lang == "en" {
                 "Rain showers".to_string()
             } else {
