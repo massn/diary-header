@@ -15,7 +15,19 @@ A command-line tool written in Rust that interactively generates a Markdown head
 
 ## Installation
 
-Ensure you have Rust and Cargo installed. Then, clone the repository and build the project:
+### Via npm (Recommended)
+
+The easiest way to install `diary-header` is via npm:
+
+```bash
+npm install -g diary-header
+```
+
+This will download a prebuilt binary for your platform and make the `diary-header` command available globally.
+
+### Via Cargo
+
+Alternatively, if you have Rust and Cargo installed, you can install from source:
 
 ```bash
 git clone https://github.com/massn/diary-header.git
@@ -49,6 +61,8 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - タイムゾーン: Asia/Tokyo
 - 日の出: 06:21:43 JST+0900
 - 日の入り: 16:32:11 JST+0900
+- 天気: 晴れ
+- 降水確率: 20%
 - 気温: 最高 18.5°C / 最低 12.3°C
 - 干支: 甲辰
 ```
@@ -61,6 +75,8 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - Timezone: Asia/Tokyo
 - Sunrise: 06:21:43 JST+0900
 - Sunset: 16:32:11 JST+0900
+- Weather: Mainly clear
+- Precipitation Probability: 20%
 - Temperature: Max 18.5°C / Min 12.3°C
 - Sexagenary Cycle: 甲辰
 ```
