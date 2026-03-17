@@ -391,55 +391,50 @@ fn get_config_path(custom_path: Option<PathBuf>) -> Result<PathBuf, Box<dyn std:
     Ok(config_dir.join("config.toml"))
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = Cli::parse();
-    let config_path = get_config_path(cli.config.clone())?;
+fn handle_config_command(config_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Updating configuration...");
+    let new_config = prompt_for_config()?;
+    let toml_string = toml::to_string(&new_config)?;
+    fs::write(config_path, toml_string)?;
+    println!(
+        "Configuration updated and saved to: {}",
+        config_path.display()
+    );
+    Ok(())
+}
 
-    match &cli.command {
-        Some(Commands::Config) => {
-            println!("Updating configuration...");
-            let new_config = prompt_for_config()?;
-            let toml_string = toml::to_string(&new_config)?;
-            fs::write(&config_path, toml_string)?;
-            println!(
-                "Configuration updated and saved to: {}",
-                config_path.display()
-            );
-            return Ok(());
-        }
-        None => {}
+fn load_or_create_config(config_path: &PathBuf) -> Result<Config, Box<dyn std::error::Error>> {
+    if config_path.exists() {
+        let config_contents = fs::read_to_string(config_path)?;
+        return Ok(toml::from_str(&config_contents)?);
     }
 
-    // 2. Check if TOML config file exists
-    let _config = if config_path.exists() {
-        let config_contents = fs::read_to_string(&config_path)?;
-        toml::from_str(&config_contents)?
-    } else {
-        println!("Configuration file not found at: {}", config_path.display());
-        let should_create = Confirm::new("Would you like to create a new configuration file?")
-            .with_default(true)
-            .prompt()?;
+    println!("Configuration file not found at: {}", config_path.display());
+    let should_create = Confirm::new("Would you like to create a new configuration file?")
+        .with_default(true)
+        .prompt()?;
 
-        if !should_create {
-            return Err("Configuration file is required to run this program.".into());
-        }
+    if !should_create {
+        return Err("Configuration file is required to run this program.".into());
+    }
 
-        // 3. Prompt interactive setup
-        let new_config = prompt_for_config()?;
+    let new_config = prompt_for_config()?;
+    let toml_string = toml::to_string(&new_config)?;
+    fs::write(config_path, toml_string)?;
+    println!("Configuration saved to: {}", config_path.display());
 
-        let toml_string = toml::to_string(&new_config)?;
-        fs::write(&config_path, toml_string)?;
-        println!("Configuration saved to: {}", config_path.display());
+    Ok(new_config)
+}
 
-        new_config
-    };
-
+fn select_date() -> Result<NaiveDate, Box<dyn std::error::Error>> {
     let now = Local::now();
-
     let today = DateSelect::new("Select date for diary header:")
         .with_default(now.date_naive())
         .prompt()?;
+    Ok(today)
+}
 
+fn build_location_choices() -> Vec<LocationChoice> {
     let mut locations = vec![LocationChoice {
         name: "Current Location (Auto via IP)".to_string(),
         is_auto: true,
@@ -456,40 +451,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    locations
+}
+
+fn select_location() -> Result<LocationChoice, Box<dyn std::error::Error>> {
+    let locations = build_location_choices();
     let selected_loc = Select::new("Select location:", locations).prompt()?;
+    Ok(selected_loc)
+}
 
-    // Fetch Geo Info
-    let geo = if selected_loc.is_auto {
-        fetch_geo_info().unwrap_or(GeoInfo {
-            status: "fail".to_string(),
-            city: "Unknown".to_string(),
-            region_name: "Unknown".to_string(),
-            lat: 0.0,
-            lon: 0.0,
-            timezone: "UTC".to_string(),
-        })
-    } else {
-        let finder = DefaultFinder::new();
-        let tz_name = finder.get_tz_name(selected_loc.lon, selected_loc.lat);
+fn get_geo_info_from_selection(
+    selected_loc: &LocationChoice,
+) -> Result<GeoInfo, Box<dyn std::error::Error>> {
+    if selected_loc.is_auto {
+        return fetch_geo_info().or_else(|_| {
+            Ok(GeoInfo {
+                status: "fail".to_string(),
+                city: "Unknown".to_string(),
+                region_name: "Unknown".to_string(),
+                lat: 0.0,
+                lon: 0.0,
+                timezone: "UTC".to_string(),
+            })
+        });
+    }
 
-        let parts: Vec<&str> = selected_loc.name.split(", ").collect();
-        let city = parts
-            .first()
-            .unwrap_or(&selected_loc.name.as_str())
-            .to_string();
+    let finder = DefaultFinder::new();
+    let tz_name = finder.get_tz_name(selected_loc.lon, selected_loc.lat);
 
-        GeoInfo {
-            status: "success".to_string(),
-            city,
-            region_name: selected_loc.name.clone(),
-            lat: selected_loc.lat,
-            lon: selected_loc.lon,
-            timezone: tz_name.to_string(),
-        }
-    };
+    let parts: Vec<&str> = selected_loc.name.split(", ").collect();
+    let city = parts
+        .first()
+        .unwrap_or(&selected_loc.name.as_str())
+        .to_string();
 
-    // Calculate Sunrise/Sunset
-    let coord = sunrise::Coordinates::new(geo.lat, geo.lon).unwrap();
+    Ok(GeoInfo {
+        status: "success".to_string(),
+        city,
+        region_name: selected_loc.name.clone(),
+        lat: selected_loc.lat,
+        lon: selected_loc.lon,
+        timezone: tz_name.to_string(),
+    })
+}
+
+struct DiaryData {
+    geo: GeoInfo,
+    sunrise_dt: DateTime<Local>,
+    sunset_dt: DateTime<Local>,
+    temp_max: f64,
+    temp_min: f64,
+    weather_code: i32,
+    precip_prob: i32,
+    eto: String,
+    rokuyo: String,
+}
+
+fn collect_diary_data(
+    geo: GeoInfo,
+    today: NaiveDate,
+    config: &Config,
+) -> Result<DiaryData, Box<dyn std::error::Error>> {
+    let coord = sunrise::Coordinates::new(geo.lat, geo.lon)
+        .ok_or("Invalid coordinates")?;
     let solar_day = sunrise::SolarDay::new(coord, today);
     let sunrise_dt: DateTime<Local> = solar_day
         .event_time(sunrise::SolarEvent::Sunrise)
@@ -498,21 +522,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .event_time(sunrise::SolarEvent::Sunset)
         .with_timezone(&Local);
 
-    // Fetch Weather Information
     let (temp_max, temp_min, weather_code, precip_prob) =
         fetch_weather_info(geo.lat, geo.lon, today).unwrap_or((0.0, 0.0, 0, 0));
 
-    // Calculate Sexagenary Cycle
     let eto = get_sexagenary_cycle(today);
+    let rokuyo = get_rokuyo(today, &config.language);
 
-    // Calculate Rokuyo (Six days)
-    let rokuyo = get_rokuyo(today, &_config.language);
+    Ok(DiaryData {
+        geo,
+        sunrise_dt,
+        sunset_dt,
+        temp_max,
+        temp_min,
+        weather_code,
+        precip_prob,
+        eto,
+        rokuyo,
+    })
+}
 
+fn format_date_string(date: NaiveDate, lang: &str) -> String {
     use chrono::Datelike;
-    let date_str = if _config.language == "en" {
-        today.format("%Y-%m-%d (%A)").to_string()
+    if lang == "en" {
+        date.format("%Y-%m-%d (%A)").to_string()
     } else {
-        let wd_jp = match today.weekday() {
+        let wd_jp = match date.weekday() {
             chrono::Weekday::Mon => "月",
             chrono::Weekday::Tue => "火",
             chrono::Weekday::Wed => "水",
@@ -521,104 +555,131 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             chrono::Weekday::Sat => "土",
             chrono::Weekday::Sun => "日",
         };
-        format!("{} ({})", today.format("%Y-%m-%d"), wd_jp)
-    };
+        format!("{} ({})", date.format("%Y-%m-%d"), wd_jp)
+    }
+}
 
-    let time_suffix = if geo.timezone == "Asia/Tokyo" {
+fn generate_header(
+    today: NaiveDate,
+    data: &DiaryData,
+    config: &Config,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let date_str = format_date_string(today, &config.language);
+    let time_suffix = if data.geo.timezone == "Asia/Tokyo" {
         "JST"
     } else {
         ""
     };
     let time_format = format!("%H:%M:%S {}%z", time_suffix);
-
-    let weather_desc = get_weather_description(weather_code, &_config.language);
+    let weather_desc = get_weather_description(data.weather_code, &config.language);
 
     let mut header = format!("## {}", date_str);
 
-    for item in &_config.display_order {
+    for item in &config.display_order {
         let line = match item {
             DisplayItem::Location => {
-                if _config.language == "en" {
+                if config.language == "en" {
                     format!(
                         "- Location (Current IP Address): {} ({})",
-                        geo.city, geo.region_name
+                        data.geo.city, data.geo.region_name
                     )
                 } else {
                     format!(
                         "- 場所 (Current IP Address): {} ({})",
-                        geo.city, geo.region_name
+                        data.geo.city, data.geo.region_name
                     )
                 }
             }
             DisplayItem::Coordinates => {
-                if _config.language == "en" {
-                    format!("- Lat/Lon: ({:.4}, {:.4})", geo.lat, geo.lon)
+                if config.language == "en" {
+                    format!("- Lat/Lon: ({:.4}, {:.4})", data.geo.lat, data.geo.lon)
                 } else {
-                    format!("- 緯度経度: ({:.4}, {:.4})", geo.lat, geo.lon)
+                    format!("- 緯度経度: ({:.4}, {:.4})", data.geo.lat, data.geo.lon)
                 }
             }
             DisplayItem::Timezone => {
-                if _config.language == "en" {
-                    format!("- Timezone: {}", geo.timezone)
+                if config.language == "en" {
+                    format!("- Timezone: {}", data.geo.timezone)
                 } else {
-                    format!("- タイムゾーン: {}", geo.timezone)
+                    format!("- タイムゾーン: {}", data.geo.timezone)
                 }
             }
             DisplayItem::Sunrise => {
-                if _config.language == "en" {
-                    format!("- Sunrise: {}", sunrise_dt.format(&time_format))
+                if config.language == "en" {
+                    format!("- Sunrise: {}", data.sunrise_dt.format(&time_format))
                 } else {
-                    format!("- 日の出: {}", sunrise_dt.format(&time_format))
+                    format!("- 日の出: {}", data.sunrise_dt.format(&time_format))
                 }
             }
             DisplayItem::Sunset => {
-                if _config.language == "en" {
-                    format!("- Sunset: {}", sunset_dt.format(&time_format))
+                if config.language == "en" {
+                    format!("- Sunset: {}", data.sunset_dt.format(&time_format))
                 } else {
-                    format!("- 日の入り: {}", sunset_dt.format(&time_format))
+                    format!("- 日の入り: {}", data.sunset_dt.format(&time_format))
                 }
             }
             DisplayItem::Weather => {
-                if _config.language == "en" {
+                if config.language == "en" {
                     format!("- Weather: {}", weather_desc)
                 } else {
                     format!("- 天気: {}", weather_desc)
                 }
             }
             DisplayItem::Precipitation => {
-                if _config.language == "en" {
-                    format!("- Precipitation Probability: {}%", precip_prob)
+                if config.language == "en" {
+                    format!("- Precipitation Probability: {}%", data.precip_prob)
                 } else {
-                    format!("- 降水確率: {}%", precip_prob)
+                    format!("- 降水確率: {}%", data.precip_prob)
                 }
             }
             DisplayItem::Temperature => {
-                if _config.language == "en" {
+                if config.language == "en" {
                     format!(
                         "- Temperature: Max {:.1}°C / Min {:.1}°C",
-                        temp_max, temp_min
+                        data.temp_max, data.temp_min
                     )
                 } else {
-                    format!("- 気温: 最高 {:.1}°C / 最低 {:.1}°C", temp_max, temp_min)
+                    format!(
+                        "- 気温: 最高 {:.1}°C / 最低 {:.1}°C",
+                        data.temp_max, data.temp_min
+                    )
                 }
             }
             DisplayItem::SexagenaryCycle => {
-                if _config.language == "en" {
-                    format!("- Sexagenary Cycle: {}", eto)
+                if config.language == "en" {
+                    format!("- Sexagenary Cycle: {}", data.eto)
                 } else {
-                    format!("- 干支: {}", eto)
+                    format!("- 干支: {}", data.eto)
                 }
             }
             DisplayItem::Rokuyo => {
-                if _config.language == "en" {
-                    format!("- Rokuyo: {}", rokuyo)
+                if config.language == "en" {
+                    format!("- Rokuyo: {}", data.rokuyo)
                 } else {
-                    format!("- 六曜: {}", rokuyo)
+                    format!("- 六曜: {}", data.rokuyo)
                 }
             }
         };
         header.push_str(&format!("\n{}", line));
     }
+
+    Ok(header)
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
+    let config_path = get_config_path(cli.config.clone())?;
+
+    if let Some(Commands::Config) = &cli.command {
+        return handle_config_command(&config_path);
+    }
+
+    let config = load_or_create_config(&config_path)?;
+    let today = select_date()?;
+    let selected_loc = select_location()?;
+    let geo = get_geo_info_from_selection(&selected_loc)?;
+    let data = collect_diary_data(geo, today, &config)?;
+    let header = generate_header(today, &data, &config)?;
 
     println!("{}", header);
 
