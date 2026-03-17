@@ -1,6 +1,6 @@
 use chrono::{DateTime, Local, NaiveDate};
 use clap::{Parser, Subcommand};
-use inquire::{DateSelect, MultiSelect, Select};
+use inquire::{Confirm, DateSelect, MultiSelect, Select};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
@@ -68,6 +68,10 @@ fn default_display_order() -> Vec<DisplayItem> {
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+
+    /// Path to config file (default: ~/.config/diary-header/config.toml)
+    #[arg(short, long, value_name = "FILE")]
+    config: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]
@@ -362,10 +366,21 @@ fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
     })
 }
 
-fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let config_dir = dirs::config_dir()
-        .ok_or("Could not find config directory")?
-        .join("diary-header");
+fn get_config_path(custom_path: Option<PathBuf>) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if let Some(path) = custom_path {
+        // If custom path is provided, ensure its directory exists
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        return Ok(path);
+    }
+
+    // Default to ~/.config/diary-header/config.toml
+    let home_dir = dirs::home_dir()
+        .ok_or("Could not find home directory")?;
+    let config_dir = home_dir.join(".config").join("diary-header");
 
     if !config_dir.exists() {
         fs::create_dir_all(&config_dir)?;
@@ -376,7 +391,7 @@ fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    let config_path = get_config_path()?;
+    let config_path = get_config_path(cli.config.clone())?;
 
     match &cli.command {
         Some(Commands::Config) => {
@@ -398,7 +413,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let config_contents = fs::read_to_string(&config_path)?;
         toml::from_str(&config_contents)?
     } else {
-        println!("Configuration file not found. Starting initial setup.");
+        println!("Configuration file not found at: {}", config_path.display());
+        let should_create = Confirm::new("Would you like to create a new configuration file?")
+            .with_default(true)
+            .prompt()?;
+
+        if !should_create {
+            return Err("Configuration file is required to run this program.".into());
+        }
+
         // 3. Prompt interactive setup
         let new_config = prompt_for_config()?;
 
