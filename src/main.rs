@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
 use std::path::PathBuf;
-use taian::{calculate_rokuyo, Rokuyo};
+use taian::{Rokuyo, calculate_rokuyo};
 use tzf_rs::DefaultFinder;
 
 #[derive(Serialize, Deserialize, Debug)]
