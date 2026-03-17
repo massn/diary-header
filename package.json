@@ -1,6 +1,6 @@
 {
   "name": "diary-header",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "A command-line tool that generates a Markdown header for daily diary entries with location, astronomical, and weather information",
   "main": "index.js",
   "bin": {
