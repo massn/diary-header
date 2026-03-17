@@ -24,3 +24,6 @@ target
 # Added by cargo
 
 /target
+
+# Node.js
+node_modules/
