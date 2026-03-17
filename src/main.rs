@@ -1,6 +1,6 @@
 use chrono::{DateTime, Local, NaiveDate};
 use clap::{Parser, Subcommand};
-use inquire::{DateSelect, Select};
+use inquire::{DateSelect, MultiSelect, Select};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
@@ -21,6 +21,24 @@ enum DisplayItem {
     Temperature,
     SexagenaryCycle,
     Rokuyo,
+}
+
+impl fmt::Display for DisplayItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            DisplayItem::Location => "Location (場所)",
+            DisplayItem::Coordinates => "Coordinates (緯度経度)",
+            DisplayItem::Timezone => "Timezone (タイムゾーン)",
+            DisplayItem::Sunrise => "Sunrise (日の出)",
+            DisplayItem::Sunset => "Sunset (日の入り)",
+            DisplayItem::Weather => "Weather (天気)",
+            DisplayItem::Precipitation => "Precipitation (降水確率)",
+            DisplayItem::Temperature => "Temperature (気温)",
+            DisplayItem::SexagenaryCycle => "Sexagenary Cycle (干支)",
+            DisplayItem::Rokuyo => "Rokuyo (六曜)",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -294,9 +312,53 @@ fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
         "ja".to_string()
     };
 
+    // Allow user to select which items to display
+    let all_items = vec![
+        DisplayItem::Location,
+        DisplayItem::Coordinates,
+        DisplayItem::Timezone,
+        DisplayItem::Sunrise,
+        DisplayItem::Sunset,
+        DisplayItem::Weather,
+        DisplayItem::Precipitation,
+        DisplayItem::Temperature,
+        DisplayItem::SexagenaryCycle,
+        DisplayItem::Rokuyo,
+    ];
+
+    let selected_items = MultiSelect::new(
+        "Select items to display (Space to toggle, Enter to confirm):",
+        all_items.clone(),
+    )
+    .with_default(&(0..all_items.len()).collect::<Vec<_>>())
+    .prompt()?;
+
+    // Let user specify the order by selecting items one by one
+    let mut display_order: Vec<DisplayItem> = Vec::new();
+    let mut remaining_items = selected_items.clone();
+
+    while !remaining_items.is_empty() {
+        let position = display_order.len() + 1;
+        let prompt_text = format!("Select item for position #{} (or press Esc to use default order):", position);
+
+        let selection = Select::new(&prompt_text, remaining_items.clone()).prompt();
+
+        match selection {
+            Ok(item) => {
+                display_order.push(item.clone());
+                remaining_items.retain(|i| i != &item);
+            }
+            Err(_) => {
+                // User cancelled, use default order for remaining items
+                display_order.extend(remaining_items);
+                break;
+            }
+        }
+    }
+
     Ok(Config {
         language,
-        display_order: default_display_order(),
+        display_order,
     })
 }
 
