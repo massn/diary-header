@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
 use std::path::PathBuf;
+use taian::{calculate_rokuyo, Rokuyo};
 use tzf_rs::DefaultFinder;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -206,6 +207,34 @@ fn get_sexagenary_cycle(date: NaiveDate) -> String {
     format!("{}{}", stems[stem_idx], branches[branch_idx])
 }
 
+fn get_rokuyo(date: NaiveDate, lang: &str) -> String {
+    let rokuyo = calculate_rokuyo(date);
+
+    match rokuyo {
+        Some(rokuyo) => {
+            if lang == "en" {
+                match rokuyo {
+                    Rokuyo::Sensho => "Sensho (先勝)".to_string(),
+                    Rokuyo::Tomobiki => "Tomobiki (友引)".to_string(),
+                    Rokuyo::Senbu => "Senbu (先負)".to_string(),
+                    Rokuyo::Butsumetsu => "Butsumetsu (仏滅)".to_string(),
+                    Rokuyo::Taian => "Taian (大安)".to_string(),
+                    Rokuyo::Shakku => "Shakku (赤口)".to_string(),
+                }
+            } else {
+                rokuyo.to_string()
+            }
+        }
+        None => {
+            if lang == "en" {
+                "Unknown".to_string()
+            } else {
+                "不明".to_string()
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 struct LocationChoice {
     name: String,
@@ -354,6 +383,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Calculate Sexagenary Cycle
     let eto = get_sexagenary_cycle(today);
 
+    // Calculate Rokuyo (Six days)
+    let rokuyo = get_rokuyo(today, &_config.language);
+
     use chrono::Datelike;
     let date_str = if _config.language == "en" {
         today.format("%Y-%m-%d (%A)").to_string()
@@ -390,7 +422,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              - Weather: {}\n\
              - Precipitation Probability: {}%\n\
              - Temperature: Max {:.1}°C / Min {:.1}°C\n\
-             - Sexagenary Cycle: {}",
+             - Sexagenary Cycle: {}\n\
+             - Rokuyo: {}",
             date_str,
             geo.city,
             geo.region_name,
@@ -403,7 +436,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             precip_prob,
             temp_max,
             temp_min,
-            eto
+            eto,
+            rokuyo
         )
     } else {
         format!(
@@ -416,7 +450,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              - 天気: {}\n\
              - 降水確率: {}%\n\
              - 気温: 最高 {:.1}°C / 最低 {:.1}°C\n\
-             - 干支: {}",
+             - 干支: {}\n\
+             - 六曜: {}",
             date_str,
             geo.city,
             geo.region_name,
@@ -429,7 +464,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             precip_prob,
             temp_max,
             temp_min,
-            eto
+            eto,
+            rokuyo
         )
     };
 
