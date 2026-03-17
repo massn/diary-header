@@ -372,10 +372,10 @@ fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
 fn get_config_path(custom_path: Option<PathBuf>) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Some(path) = custom_path {
         // If custom path is provided, ensure its directory exists
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
+        if let Some(parent) = path.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent)?;
         }
         return Ok(path);
     }
@@ -512,8 +512,7 @@ fn collect_diary_data(
     today: NaiveDate,
     config: &Config,
 ) -> Result<DiaryData, Box<dyn std::error::Error>> {
-    let coord = sunrise::Coordinates::new(geo.lat, geo.lon)
-        .ok_or("Invalid coordinates")?;
+    let coord = sunrise::Coordinates::new(geo.lat, geo.lon).ok_or("Invalid coordinates")?;
     let solar_day = sunrise::SolarDay::new(coord, today);
     let sunrise_dt: DateTime<Local> = solar_day
         .event_time(sunrise::SolarEvent::Sunrise)
