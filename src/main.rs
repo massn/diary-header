@@ -343,7 +343,10 @@ fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
 
     while !remaining_items.is_empty() {
         let position = display_order.len() + 1;
-        let prompt_text = format!("Select item for position #{} (or press Esc to use default order):", position);
+        let prompt_text = format!(
+            "Select item for position #{} (or press Esc to use default order):",
+            position
+        );
 
         let selection = Select::new(&prompt_text, remaining_items.clone()).prompt();
 
@@ -378,8 +381,7 @@ fn get_config_path(custom_path: Option<PathBuf>) -> Result<PathBuf, Box<dyn std:
     }
 
     // Default to ~/.config/diary-header/config.toml
-    let home_dir = dirs::home_dir()
-        .ok_or("Could not find home directory")?;
+    let home_dir = dirs::home_dir().ok_or("Could not find home directory")?;
     let config_dir = home_dir.join(".config").join("diary-header");
 
     if !config_dir.exists() {
@@ -537,9 +539,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let line = match item {
             DisplayItem::Location => {
                 if _config.language == "en" {
-                    format!("- Location (Current IP Address): {} ({})", geo.city, geo.region_name)
+                    format!(
+                        "- Location (Current IP Address): {} ({})",
+                        geo.city, geo.region_name
+                    )
                 } else {
-                    format!("- 場所 (Current IP Address): {} ({})", geo.city, geo.region_name)
+                    format!(
+                        "- 場所 (Current IP Address): {} ({})",
+                        geo.city, geo.region_name
+                    )
                 }
             }
             DisplayItem::Coordinates => {
@@ -586,7 +594,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             DisplayItem::Temperature => {
                 if _config.language == "en" {
-                    format!("- Temperature: Max {:.1}°C / Min {:.1}°C", temp_max, temp_min)
+                    format!(
+                        "- Temperature: Max {:.1}°C / Min {:.1}°C",
+                        temp_max, temp_min
+                    )
                 } else {
                     format!("- 気温: 最高 {:.1}°C / 最低 {:.1}°C", temp_max, temp_min)
                 }
