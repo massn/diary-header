@@ -8,9 +8,41 @@ use std::path::PathBuf;
 use taian::{Rokuyo, calculate_rokuyo};
 use tzf_rs::DefaultFinder;
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum DisplayItem {
+    Location,
+    Coordinates,
+    Timezone,
+    Sunrise,
+    Sunset,
+    Weather,
+    Precipitation,
+    Temperature,
+    SexagenaryCycle,
+    Rokuyo,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
     language: String,
+    #[serde(default = "default_display_order")]
+    display_order: Vec<DisplayItem>,
+}
+
+fn default_display_order() -> Vec<DisplayItem> {
+    vec![
+        DisplayItem::Location,
+        DisplayItem::Coordinates,
+        DisplayItem::Timezone,
+        DisplayItem::Sunrise,
+        DisplayItem::Sunset,
+        DisplayItem::Weather,
+        DisplayItem::Precipitation,
+        DisplayItem::Temperature,
+        DisplayItem::SexagenaryCycle,
+        DisplayItem::Rokuyo,
+    ]
 }
 
 #[derive(Parser)]
@@ -262,7 +294,10 @@ fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
         "ja".to_string()
     };
 
-    Ok(Config { language })
+    Ok(Config {
+        language,
+        display_order: default_display_order(),
+    })
 }
 
 fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
@@ -411,63 +446,83 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let weather_desc = get_weather_description(weather_code, &_config.language);
 
-    let header = if _config.language == "en" {
-        format!(
-            "## {}\n\
-             - Location (Current IP Address): {} ({})\n\
-             - Lat/Lon: ({:.4}, {:.4})\n\
-             - Timezone: {}\n\
-             - Sunrise: {}\n\
-             - Sunset: {}\n\
-             - Weather: {}\n\
-             - Precipitation Probability: {}%\n\
-             - Temperature: Max {:.1}°C / Min {:.1}°C\n\
-             - Sexagenary Cycle: {}\n\
-             - Rokuyo: {}",
-            date_str,
-            geo.city,
-            geo.region_name,
-            geo.lat,
-            geo.lon,
-            geo.timezone,
-            sunrise_dt.format(&time_format),
-            sunset_dt.format(&time_format),
-            weather_desc,
-            precip_prob,
-            temp_max,
-            temp_min,
-            eto,
-            rokuyo
-        )
-    } else {
-        format!(
-            "## {}\n\
-             - 場所 (Current IP Address): {} ({})\n\
-             - 緯度経度: ({:.4}, {:.4})\n\
-             - タイムゾーン: {}\n\
-             - 日の出: {}\n\
-             - 日の入り: {}\n\
-             - 天気: {}\n\
-             - 降水確率: {}%\n\
-             - 気温: 最高 {:.1}°C / 最低 {:.1}°C\n\
-             - 干支: {}\n\
-             - 六曜: {}",
-            date_str,
-            geo.city,
-            geo.region_name,
-            geo.lat,
-            geo.lon,
-            geo.timezone,
-            sunrise_dt.format(&time_format),
-            sunset_dt.format(&time_format),
-            weather_desc,
-            precip_prob,
-            temp_max,
-            temp_min,
-            eto,
-            rokuyo
-        )
-    };
+    let mut header = format!("## {}", date_str);
+
+    for item in &_config.display_order {
+        let line = match item {
+            DisplayItem::Location => {
+                if _config.language == "en" {
+                    format!("- Location (Current IP Address): {} ({})", geo.city, geo.region_name)
+                } else {
+                    format!("- 場所 (Current IP Address): {} ({})", geo.city, geo.region_name)
+                }
+            }
+            DisplayItem::Coordinates => {
+                if _config.language == "en" {
+                    format!("- Lat/Lon: ({:.4}, {:.4})", geo.lat, geo.lon)
+                } else {
+                    format!("- 緯度経度: ({:.4}, {:.4})", geo.lat, geo.lon)
+                }
+            }
+            DisplayItem::Timezone => {
+                if _config.language == "en" {
+                    format!("- Timezone: {}", geo.timezone)
+                } else {
+                    format!("- タイムゾーン: {}", geo.timezone)
+                }
+            }
+            DisplayItem::Sunrise => {
+                if _config.language == "en" {
+                    format!("- Sunrise: {}", sunrise_dt.format(&time_format))
+                } else {
+                    format!("- 日の出: {}", sunrise_dt.format(&time_format))
+                }
+            }
+            DisplayItem::Sunset => {
+                if _config.language == "en" {
+                    format!("- Sunset: {}", sunset_dt.format(&time_format))
+                } else {
+                    format!("- 日の入り: {}", sunset_dt.format(&time_format))
+                }
+            }
+            DisplayItem::Weather => {
+                if _config.language == "en" {
+                    format!("- Weather: {}", weather_desc)
+                } else {
+                    format!("- 天気: {}", weather_desc)
+                }
+            }
+            DisplayItem::Precipitation => {
+                if _config.language == "en" {
+                    format!("- Precipitation Probability: {}%", precip_prob)
+                } else {
+                    format!("- 降水確率: {}%", precip_prob)
+                }
+            }
+            DisplayItem::Temperature => {
+                if _config.language == "en" {
+                    format!("- Temperature: Max {:.1}°C / Min {:.1}°C", temp_max, temp_min)
+                } else {
+                    format!("- 気温: 最高 {:.1}°C / 最低 {:.1}°C", temp_max, temp_min)
+                }
+            }
+            DisplayItem::SexagenaryCycle => {
+                if _config.language == "en" {
+                    format!("- Sexagenary Cycle: {}", eto)
+                } else {
+                    format!("- 干支: {}", eto)
+                }
+            }
+            DisplayItem::Rokuyo => {
+                if _config.language == "en" {
+                    format!("- Rokuyo: {}", rokuyo)
+                } else {
+                    format!("- 六曜: {}", rokuyo)
+                }
+            }
+        };
+        header.push_str(&format!("\n{}", line));
+    }
 
     println!("{}", header);
 

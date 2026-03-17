@@ -12,6 +12,7 @@ A command-line tool written in Rust that interactively generates a Markdown head
 - **Sexagenary Cycle (干支)**: Automatically computes the traditional continuous calendar cycle (Eto) for the given date.
 - **Six-Day Cycle (六曜)**: Calculates the traditional Japanese six-day cycle (Rokuyo) for fortune-telling and event planning.
 - **Language Configuration**: Choose between Japanese (ja) and English (en) for the output format.
+- **Customizable Display Order**: Configure which information to display and in what order via the config file.
 - **Persistent Configuration**: Prompts for an initial configuration (language) and saves it to a configuration file (`~/.config/diary-header/config.toml`). You can update this later using the `config` subcommand.
 
 ## Installation
@@ -92,11 +93,9 @@ diary-header >> my-diary.md
 
 ## Configuration
 
-The configuration file is stored in `~/.config/diary-header/config.toml` (macOS/Linux) or `%APPDATA%\diary-header\config.toml` (Windows). It only contains the language setting as of the current version:
+The configuration file is stored in `~/.config/diary-header/config.toml` (macOS/Linux) or `%APPDATA%\diary-header\config.toml` (Windows).
 
-```toml
-language = "en"
-```
+### Language Setting
 
 You can interactively change the language setting at any time by using the `config` subcommand:
 
@@ -105,6 +104,51 @@ diary-header config
 # Or with cargo:
 cargo run -- config
 ```
+
+### Display Order Customization
+
+You can customize the order of displayed information by manually editing the configuration file. By default, all items are displayed in the following order:
+
+```toml
+language = "en"
+display_order = [
+    "location",
+    "coordinates",
+    "timezone",
+    "sunrise",
+    "sunset",
+    "weather",
+    "precipitation",
+    "temperature",
+    "sexagenary_cycle",
+    "rokuyo",
+]
+```
+
+**Available items:**
+- `location` - Location information (city/region)
+- `coordinates` - Latitude and longitude
+- `timezone` - Timezone
+- `sunrise` - Sunrise time
+- `sunset` - Sunset time
+- `weather` - Weather condition
+- `precipitation` - Precipitation probability
+- `temperature` - Max/min temperature
+- `sexagenary_cycle` - Sexagenary cycle (干支)
+- `rokuyo` - Six-day cycle (六曜)
+
+You can reorder these items or remove items you don't need. For example, to show only weather-related information:
+
+```toml
+language = "ja"
+display_order = [
+    "weather",
+    "temperature",
+    "precipitation",
+]
+```
+
+Items not included in `display_order` will not be displayed in the output.
 
 ## Dependencies
 
