@@ -10,6 +10,7 @@ A command-line tool written in Rust that interactively generates a Markdown head
 - **Astronomical Calculations**: Calculates precise sunrise and sunset times based on the selected date and location coordinates.
 - **Weather Information**: Retrieves daily maximum and minimum temperatures for the selected date and location.
 - **Sexagenary Cycle (干支)**: Automatically computes the traditional continuous calendar cycle (Eto) for the given date.
+- **Six-Day Cycle (六曜)**: Calculates the traditional Japanese six-day cycle (Rokuyo) for fortune-telling and event planning.
 - **Language Configuration**: Choose between Japanese (ja) and English (en) for the output format.
 - **Persistent Configuration**: Prompts for an initial configuration (language) and saves it to a configuration file (`~/.config/diary-header/config.toml`). You can update this later using the `config` subcommand.
 
@@ -65,6 +66,7 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - 降水確率: 20%
 - 気温: 最高 18.5°C / 最低 12.3°C
 - 干支: 甲辰
+- 六曜: 先勝
 ```
 
 **English Output (`en`):**
@@ -79,6 +81,7 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - Precipitation Probability: 20%
 - Temperature: Max 18.5°C / Min 12.3°C
 - Sexagenary Cycle: 甲辰
+- Rokuyo: 先勝
 ```
 
 You can redirect this output directly to your diary file or copy it securely:
