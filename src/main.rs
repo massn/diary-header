@@ -561,7 +561,10 @@ fn format_date_string(date: NaiveDate, lang: &str) -> String {
 
 fn get_template_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let home_dir = dirs::home_dir().ok_or("Could not find home directory")?;
-    let template_dir = home_dir.join(".config").join("diary-header").join("templates");
+    let template_dir = home_dir
+        .join(".config")
+        .join("diary-header")
+        .join("templates");
 
     if !template_dir.exists() {
         fs::create_dir_all(&template_dir)?;
@@ -618,9 +621,11 @@ fn generate_header(
     context.insert("rokuyo", &data.rokuyo);
 
     // Convert display_order to string names for template
-    let display_order_names: Vec<String> = config.display_order.iter().map(|item| {
-        format!("{:?}", item)
-    }).collect();
+    let display_order_names: Vec<String> = config
+        .display_order
+        .iter()
+        .map(|item| format!("{:?}", item))
+        .collect();
     context.insert("display_order", &display_order_names);
 
     let rendered = tera.render(&config.language, &context)?;
