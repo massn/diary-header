@@ -6,6 +6,7 @@ use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 use taian::{Rokuyo, calculate_rokuyo};
+use tera::{Context, Tera};
 use tzf_rs::DefaultFinder;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -558,11 +559,39 @@ fn format_date_string(date: NaiveDate, lang: &str) -> String {
     }
 }
 
+fn get_template_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let home_dir = dirs::home_dir().ok_or("Could not find home directory")?;
+    let template_dir = home_dir.join(".config").join("diary-header").join("templates");
+
+    if !template_dir.exists() {
+        fs::create_dir_all(&template_dir)?;
+
+        // Copy default templates
+        let ja_template = include_str!("../templates/ja.tera");
+        let en_template = include_str!("../templates/en.tera");
+
+        fs::write(template_dir.join("ja.tera"), ja_template)?;
+        fs::write(template_dir.join("en.tera"), en_template)?;
+    }
+
+    Ok(template_dir)
+}
+
 fn generate_header(
     today: NaiveDate,
     data: &DiaryData,
     config: &Config,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    let template_dir = get_template_dir()?;
+    let template_path = template_dir.join(format!("{}.tera", config.language));
+
+    if !template_path.exists() {
+        return Err(format!("Template file not found: {}", template_path.display()).into());
+    }
+
+    let mut tera = Tera::default();
+    tera.add_template_file(&template_path, Some(&config.language))?;
+
     let date_str = format_date_string(today, &config.language);
     let time_suffix = if data.geo.timezone == "Asia/Tokyo" {
         "JST"
@@ -572,97 +601,30 @@ fn generate_header(
     let time_format = format!("%H:%M:%S {}%z", time_suffix);
     let weather_desc = get_weather_description(data.weather_code, &config.language);
 
-    let mut header = format!("## {}", date_str);
+    let mut context = Context::new();
+    context.insert("date_str", &date_str);
+    context.insert("city", &data.geo.city);
+    context.insert("region_name", &data.geo.region_name);
+    context.insert("lat", &format!("{:.4}", data.geo.lat));
+    context.insert("lon", &format!("{:.4}", data.geo.lon));
+    context.insert("timezone", &data.geo.timezone);
+    context.insert("sunrise", &data.sunrise_dt.format(&time_format).to_string());
+    context.insert("sunset", &data.sunset_dt.format(&time_format).to_string());
+    context.insert("weather", &weather_desc);
+    context.insert("precipitation", &data.precip_prob);
+    context.insert("temp_max", &format!("{:.1}", data.temp_max));
+    context.insert("temp_min", &format!("{:.1}", data.temp_min));
+    context.insert("eto", &data.eto);
+    context.insert("rokuyo", &data.rokuyo);
 
-    for item in &config.display_order {
-        let line = match item {
-            DisplayItem::Location => {
-                if config.language == "en" {
-                    format!(
-                        "- Location (Current IP Address): {} ({})",
-                        data.geo.city, data.geo.region_name
-                    )
-                } else {
-                    format!(
-                        "- 場所 (Current IP Address): {} ({})",
-                        data.geo.city, data.geo.region_name
-                    )
-                }
-            }
-            DisplayItem::Coordinates => {
-                if config.language == "en" {
-                    format!("- Lat/Lon: ({:.4}, {:.4})", data.geo.lat, data.geo.lon)
-                } else {
-                    format!("- 緯度経度: ({:.4}, {:.4})", data.geo.lat, data.geo.lon)
-                }
-            }
-            DisplayItem::Timezone => {
-                if config.language == "en" {
-                    format!("- Timezone: {}", data.geo.timezone)
-                } else {
-                    format!("- タイムゾーン: {}", data.geo.timezone)
-                }
-            }
-            DisplayItem::Sunrise => {
-                if config.language == "en" {
-                    format!("- Sunrise: {}", data.sunrise_dt.format(&time_format))
-                } else {
-                    format!("- 日の出: {}", data.sunrise_dt.format(&time_format))
-                }
-            }
-            DisplayItem::Sunset => {
-                if config.language == "en" {
-                    format!("- Sunset: {}", data.sunset_dt.format(&time_format))
-                } else {
-                    format!("- 日の入り: {}", data.sunset_dt.format(&time_format))
-                }
-            }
-            DisplayItem::Weather => {
-                if config.language == "en" {
-                    format!("- Weather: {}", weather_desc)
-                } else {
-                    format!("- 天気: {}", weather_desc)
-                }
-            }
-            DisplayItem::Precipitation => {
-                if config.language == "en" {
-                    format!("- Precipitation Probability: {}%", data.precip_prob)
-                } else {
-                    format!("- 降水確率: {}%", data.precip_prob)
-                }
-            }
-            DisplayItem::Temperature => {
-                if config.language == "en" {
-                    format!(
-                        "- Temperature: Max {:.1}°C / Min {:.1}°C",
-                        data.temp_max, data.temp_min
-                    )
-                } else {
-                    format!(
-                        "- 気温: 最高 {:.1}°C / 最低 {:.1}°C",
-                        data.temp_max, data.temp_min
-                    )
-                }
-            }
-            DisplayItem::SexagenaryCycle => {
-                if config.language == "en" {
-                    format!("- Sexagenary Cycle: {}", data.eto)
-                } else {
-                    format!("- 干支: {}", data.eto)
-                }
-            }
-            DisplayItem::Rokuyo => {
-                if config.language == "en" {
-                    format!("- Rokuyo: {}", data.rokuyo)
-                } else {
-                    format!("- 六曜: {}", data.rokuyo)
-                }
-            }
-        };
-        header.push_str(&format!("\n{}", line));
-    }
+    // Convert display_order to string names for template
+    let display_order_names: Vec<String> = config.display_order.iter().map(|item| {
+        format!("{:?}", item)
+    }).collect();
+    context.insert("display_order", &display_order_names);
 
-    Ok(header)
+    let rendered = tera.render(&config.language, &context)?;
+    Ok(rendered)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,0 +1,24 @@
+## {{ date_str }}
+{% for item in display_order -%}
+{% if item == "Location" -%}
+- Location (Current IP Address): {{ city }} ({{ region_name }})
+{% elif item == "Coordinates" -%}
+- Lat/Lon: ({{ lat }}, {{ lon }})
+{% elif item == "Timezone" -%}
+- Timezone: {{ timezone }}
+{% elif item == "Sunrise" -%}
+- Sunrise: {{ sunrise }}
+{% elif item == "Sunset" -%}
+- Sunset: {{ sunset }}
+{% elif item == "Weather" -%}
+- Weather: {{ weather }}
+{% elif item == "Precipitation" -%}
+- Precipitation Probability: {{ precipitation }}%
+{% elif item == "Temperature" -%}
+- Temperature: Max {{ temp_max }}°C / Min {{ temp_min }}°C
+{% elif item == "SexagenaryCycle" -%}
+- Sexagenary Cycle: {{ eto }}
+{% elif item == "Rokuyo" -%}
+- Rokuyo: {{ rokuyo }}
+{% endif -%}
+{% endfor -%}
