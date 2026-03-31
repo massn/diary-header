@@ -215,9 +215,14 @@ fn fetch_weather_info(
     date: NaiveDate,
 ) -> Result<(f64, f64, i32, i32), Box<dyn std::error::Error>> {
     let date_str = date.format("%Y-%m-%d").to_string();
+
+    // Use archive API for past dates, forecast API for today and future dates
+    let today = Local::now().date_naive();
+    let endpoint = if date < today { "archive" } else { "forecast" };
+
     let url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max&start_date={}&end_date={}&timezone=auto",
-        lat, lon, date_str, date_str
+        "https://api.open-meteo.com/v1/{}?latitude={}&longitude={}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max&start_date={}&end_date={}&timezone=auto",
+        endpoint, lat, lon, date_str, date_str
     );
 
     let resp = reqwest::blocking::get(&url)?.json::<WeatherResponse>()?;
