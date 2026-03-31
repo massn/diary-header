@@ -161,6 +161,62 @@ Items not included in `display_order` will not be displayed in the output.
 - **[clap](https://crates.io/crates/clap)**: For CLI argument parsing and subcommands.
 - **[serde](https://crates.io/crates/serde) / [serde_json](https://crates.io/crates/serde_json) / [toml](https://crates.io/crates/toml)**: For data serialization and writing/reading the config.
 
+## Development
+
+### Release Process
+
+The version is managed through `package.json`, which serves as the single source of truth. The `build.rs` script automatically reads the version from `package.json` during compilation.
+
+To create a new release:
+
+1. **Update the version in `package.json`:**
+   ```bash
+   # Edit package.json and update the version field
+   # Example: "version": "0.1.9"
+   ```
+
+2. **Update `Cargo.toml` version (optional but recommended):**
+   ```bash
+   # Keep Cargo.toml in sync to avoid confusion
+   # Example: version = "0.1.9"
+   ```
+
+3. **Update `Cargo.lock`:**
+   ```bash
+   cargo update -p diary-header
+   ```
+
+4. **Build and verify the version:**
+   ```bash
+   cargo build --release
+   ./target/release/diary-header --version
+   # Should output: diary-header 0.1.9
+   ```
+
+5. **Commit the changes:**
+   ```bash
+   git add package.json Cargo.toml Cargo.lock
+   git commit -m "chore: bump version to 0.1.9"
+   ```
+
+6. **Create a git tag:**
+   ```bash
+   git tag -a v0.1.9 -m "Release v0.1.9"
+   ```
+
+7. **Push to remote:**
+   ```bash
+   git push origin main
+   git push origin v0.1.9
+   ```
+
+8. **Publish to npm:**
+   ```bash
+   npm publish
+   ```
+
+**Note:** The version displayed by `--version` comes from `package.json`, not from git tags. This ensures consistent versioning across npm packages and the binary.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
