@@ -210,11 +210,13 @@ fn get_weather_description(code: i32, lang: &str) -> String {
     }
 }
 
+type WeatherInfo = (f64, f64, i32, Option<i32>);
+
 fn fetch_weather_info(
     lat: f64,
     lon: f64,
     date: NaiveDate,
-) -> Result<(f64, f64, i32, Option<i32>), Box<dyn std::error::Error>> {
+) -> Result<WeatherInfo, Box<dyn std::error::Error>> {
     let date_str = date.format("%Y-%m-%d").to_string();
 
     // Use archive API for past dates, forecast API for today and future dates
