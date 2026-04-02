@@ -98,6 +98,7 @@ struct WeatherDaily {
     temperature_2m_max: Vec<f64>,
     temperature_2m_min: Vec<f64>,
     weather_code: Vec<i32>,
+    #[serde(default)]
     precipitation_probability_max: Vec<i32>,
 }
 
@@ -213,16 +214,24 @@ fn fetch_weather_info(
     lat: f64,
     lon: f64,
     date: NaiveDate,
-) -> Result<(f64, f64, i32, i32), Box<dyn std::error::Error>> {
+) -> Result<(f64, f64, i32, Option<i32>), Box<dyn std::error::Error>> {
     let date_str = date.format("%Y-%m-%d").to_string();
 
     // Use archive API for past dates, forecast API for today and future dates
     let today = Local::now().date_naive();
-    let endpoint = if date < today { "archive" } else { "forecast" };
+    let is_archive = date < today;
+    let endpoint = if is_archive { "archive" } else { "forecast" };
+
+    // precipitation_probability_max is only available in the forecast API
+    let daily_params = if is_archive {
+        "temperature_2m_max,temperature_2m_min,weather_code"
+    } else {
+        "temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max"
+    };
 
     let url = format!(
-        "https://api.open-meteo.com/v1/{}?latitude={}&longitude={}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max&start_date={}&end_date={}&timezone=auto",
-        endpoint, lat, lon, date_str, date_str
+        "https://api.open-meteo.com/v1/{}?latitude={}&longitude={}&daily={}&start_date={}&end_date={}&timezone=auto",
+        endpoint, lat, lon, daily_params, date_str, date_str
     );
 
     let resp = reqwest::blocking::get(&url)?.json::<WeatherResponse>()?;
@@ -240,12 +249,7 @@ fn fetch_weather_info(
         .copied()
         .unwrap_or(0.0);
     let weather_code = resp.daily.weather_code.first().copied().unwrap_or(0);
-    let precip_prob = resp
-        .daily
-        .precipitation_probability_max
-        .first()
-        .copied()
-        .unwrap_or(0);
+    let precip_prob = resp.daily.precipitation_probability_max.first().copied();
 
     Ok((temp_max, temp_min, weather_code, precip_prob))
 }
@@ -508,7 +512,7 @@ struct DiaryData {
     temp_max: f64,
     temp_min: f64,
     weather_code: i32,
-    precip_prob: i32,
+    precip_prob: Option<i32>,
     eto: String,
     rokuyo: String,
 }
@@ -528,7 +532,7 @@ fn collect_diary_data(
         .with_timezone(&Local);
 
     let (temp_max, temp_min, weather_code, precip_prob) =
-        fetch_weather_info(geo.lat, geo.lon, today).unwrap_or((0.0, 0.0, 0, 0));
+        fetch_weather_info(geo.lat, geo.lon, today).unwrap_or((0.0, 0.0, 0, None));
 
     let eto = get_sexagenary_cycle(today);
     let rokuyo = get_rokuyo(today, &config.language);
@@ -618,8 +622,12 @@ fn generate_header(
     context.insert("timezone", &data.geo.timezone);
     context.insert("sunrise", &data.sunrise_dt.format(&time_format).to_string());
     context.insert("sunset", &data.sunset_dt.format(&time_format).to_string());
+    let precip_str = match data.precip_prob {
+        Some(p) => format!("{}%", p),
+        None => "N/A".to_string(),
+    };
     context.insert("weather", &weather_desc);
-    context.insert("precipitation", &data.precip_prob);
+    context.insert("precipitation", &precip_str);
     context.insert("temp_max", &format!("{:.1}", data.temp_max));
     context.insert("temp_min", &format!("{:.1}", data.temp_min));
     context.insert("eto", &data.eto);
