@@ -625,7 +625,7 @@ fn generate_header(
     context.insert("sunrise", &data.sunrise_dt.format(&time_format).to_string());
     context.insert("sunset", &data.sunset_dt.format(&time_format).to_string());
     let precip_str = match data.precip_prob {
-        Some(p) => format!("{}%", p),
+        Some(p) => format!("{}", p),
         None => "N/A".to_string(),
     };
     context.insert("weather", &weather_desc);

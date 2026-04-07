@@ -13,7 +13,7 @@
 {% elif item == "Weather" -%}
 - 天気: {{ weather }}
 {% elif item == "Precipitation" -%}
-- 降水確率: {{ precipitation }}
+- 降水確率: {{ precipitation }}%
 {% elif item == "Temperature" -%}
 - 気温: 最高 {{ temp_max }}°C / 最低 {{ temp_min }}°C
 {% elif item == "SexagenaryCycle" -%}

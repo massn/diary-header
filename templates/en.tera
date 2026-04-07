@@ -13,7 +13,7 @@
 {% elif item == "Weather" -%}
 - Weather: {{ weather }}
 {% elif item == "Precipitation" -%}
-- Precipitation Probability: {{ precipitation }}
+- Precipitation Probability: {{ precipitation }}%
 {% elif item == "Temperature" -%}
 - Temperature: Max {{ temp_max }}°C / Min {{ temp_min }}°C
 {% elif item == "SexagenaryCycle" -%}
