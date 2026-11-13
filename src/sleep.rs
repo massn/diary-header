@@ -4,7 +4,7 @@
 //! Run `diary-header auth` once to obtain a refresh token, which is stored
 //! next to the config file and reused on subsequent runs.
 
-use chrono::{Duration, NaiveDate};
+use chrono::{DateTime, Duration, FixedOffset, Local, NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -39,6 +39,10 @@ struct TokenResponse {
 /// Minutes spent in each stage during one sleep session.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct SleepBreakdown {
+    /// Local time the sleep session started (bedtime).
+    pub start: Option<NaiveTime>,
+    /// Local time the sleep session ended (wake-up time).
+    pub end: Option<NaiveTime>,
     /// Total minutes asleep (light + deep + REM, excluding awake).
     pub total: i64,
     pub deep: i64,
@@ -67,9 +71,34 @@ struct DataPoint {
 
 #[derive(Deserialize, Debug)]
 struct Sleep {
+    interval: Option<SessionTimeInterval>,
     #[serde(default)]
     metadata: SleepMetadata,
     summary: Option<SleepSummary>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct SessionTimeInterval {
+    start_time: Option<String>,
+    start_utc_offset: Option<String>,
+    end_time: Option<String>,
+    end_utc_offset: Option<String>,
+}
+
+/// Converts an RFC 3339 timestamp to the local time at the given UTC offset
+/// (e.g. "32400s"). Falls back to the system time zone if the offset is missing.
+fn to_local_time(timestamp: &Option<String>, utc_offset: &Option<String>) -> Option<NaiveTime> {
+    let dt = DateTime::parse_from_rfc3339(timestamp.as_deref()?).ok()?;
+    let offset = utc_offset
+        .as_deref()
+        .and_then(|o| o.strip_suffix('s'))
+        .and_then(|secs| secs.parse::<f64>().ok())
+        .and_then(|secs| FixedOffset::east_opt(secs as i32));
+    Some(match offset {
+        Some(offset) => dt.with_timezone(&offset).time(),
+        None => dt.with_timezone(&Local).time(),
+    })
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -138,6 +167,10 @@ impl Sleep {
             Some(_) => parse_minutes(&summary.minutes_asleep),
             None => b.deep + b.light + b.rem,
         };
+        if let Some(interval) = &self.interval {
+            b.start = to_local_time(&interval.start_time, &interval.start_utc_offset);
+            b.end = to_local_time(&interval.end_time, &interval.end_utc_offset);
+        }
         Some(b)
     }
 }
@@ -422,19 +455,35 @@ fn format_minutes(minutes: i64, lang: &str) -> String {
     }
 }
 
+/// Formats the sleep data for the diary header.
+///
+/// The first line holds the time range and total sleep time; the stage
+/// breakdown follows as an indented Markdown sub-list.
 pub fn format_breakdown(b: &SleepBreakdown, lang: &str) -> String {
-    let labels = if lang == "en" {
-        ["Total", "Deep", "Light", "REM", "Falling asleep", "Awake"]
+    let (total_label, labels) = if lang == "en" {
+        ("Total", ["Deep", "Light", "REM", "Falling asleep", "Awake"])
     } else {
-        ["合計", "深い", "浅い", "レム", "寝付けず", "覚醒"]
+        ("合計", ["深い", "浅い", "レム", "寝付けず", "覚醒"])
     };
-    let values = [b.total, b.deep, b.light, b.rem, b.to_fall_asleep, b.awake];
-    labels
-        .iter()
-        .zip(values)
-        .map(|(label, v)| format!("{} {}", label, format_minutes(v, lang)))
-        .collect::<Vec<_>>()
-        .join(" / ")
+
+    let mut summary: Vec<String> = Vec::new();
+    if let (Some(start), Some(end)) = (b.start, b.end) {
+        let sep = if lang == "en" { "-" } else { "〜" };
+        summary.push(format!(
+            "{}{}{}",
+            start.format("%H:%M"),
+            sep,
+            end.format("%H:%M")
+        ));
+    }
+    summary.push(format!("{} {}", total_label, format_minutes(b.total, lang)));
+
+    let values = [b.deep, b.light, b.rem, b.to_fall_asleep, b.awake];
+    let mut out = summary.join(" / ");
+    for (label, v) in labels.iter().zip(values) {
+        out.push_str(&format!("\n  - {} {}", label, format_minutes(v, lang)));
+    }
+    out
 }
 
 #[cfg(test)]
@@ -454,6 +503,12 @@ mod tests {
           "dataPointName": "main",
           "sleep": {
             "type": "STAGES",
+            "interval": {
+              "startTime": "2026-11-12T14:12:30Z",
+              "startUtcOffset": "32400s",
+              "endTime": "2026-11-12T21:58:00Z",
+              "endUtcOffset": "32400s"
+            },
             "metadata": {"stagesStatus": "SUCCEEDED", "processed": true, "main": true},
             "summary": {
               "minutesInSleepPeriod": "464",
@@ -487,6 +542,8 @@ mod tests {
         assert_eq!(
             b,
             SleepBreakdown {
+                start: NaiveTime::from_hms_opt(23, 12, 30),
+                end: NaiveTime::from_hms_opt(6, 58, 0),
                 total: 407,
                 deep: 114,
                 light: 198,
@@ -514,7 +571,9 @@ mod tests {
 
     #[test]
     fn formats_breakdown() {
-        let b = SleepBreakdown {
+        let mut b = SleepBreakdown {
+            start: NaiveTime::from_hms_opt(23, 12, 30),
+            end: NaiveTime::from_hms_opt(6, 58, 0),
             total: 406,
             deep: 114,
             light: 198,
@@ -524,12 +583,15 @@ mod tests {
         };
         assert_eq!(
             format_breakdown(&b, "ja"),
-            "合計 6時間46分 / 深い 1時間54分 / 浅い 3時間18分 / レム 1時間34分 / 寝付けず 0分 / 覚醒 56分"
+            "23:12〜06:58 / 合計 6時間46分\n  - 深い 1時間54分\n  - 浅い 3時間18分\n  - レム 1時間34分\n  - 寝付けず 0分\n  - 覚醒 56分"
         );
         assert_eq!(
             format_breakdown(&b, "en"),
-            "Total 6h46m / Deep 1h54m / Light 3h18m / REM 1h34m / Falling asleep 0m / Awake 56m"
+            "23:12-06:58 / Total 6h46m\n  - Deep 1h54m\n  - Light 3h18m\n  - REM 1h34m\n  - Falling asleep 0m\n  - Awake 56m"
         );
+        // The time range is omitted when the interval is unavailable
+        b.start = None;
+        assert!(format_breakdown(&b, "ja").starts_with("合計 6時間46分\n"));
     }
 
     #[test]
