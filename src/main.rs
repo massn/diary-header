@@ -551,6 +551,7 @@ fn get_geo_info_from_selection(
 
 struct DiaryData {
     geo: GeoInfo,
+    location_is_auto: bool,
     sunrise_dt: DateTime<Local>,
     sunset_dt: DateTime<Local>,
     temp_max: f64,
@@ -615,6 +616,7 @@ fn fetch_sleep_if_needed(
 
 fn collect_diary_data(
     geo: GeoInfo,
+    location_is_auto: bool,
     today: NaiveDate,
     config: &Config,
     config_path: &std::path::Path,
@@ -637,6 +639,7 @@ fn collect_diary_data(
 
     Ok(DiaryData {
         geo,
+        location_is_auto,
         sunrise_dt,
         sunset_dt,
         temp_max,
@@ -716,6 +719,7 @@ fn generate_header(
     context.insert("date_str", &date_str);
     context.insert("city", &data.geo.city);
     context.insert("region_name", &data.geo.region_name);
+    context.insert("location_is_auto", &data.location_is_auto);
     context.insert("lat", &format!("{:.4}", data.geo.lat));
     context.insert("lon", &format!("{:.4}", data.geo.lon));
     context.insert("timezone", &data.geo.timezone);
@@ -763,10 +767,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let today = select_date()?;
     let selected_loc = select_location()?;
     let geo = get_geo_info_from_selection(&selected_loc)?;
-    let data = collect_diary_data(geo, today, &config, &config_path)?;
+    let data = collect_diary_data(geo, selected_loc.is_auto, today, &config, &config_path)?;
     let header = generate_header(today, &data, &config)?;
 
     println!("{}", header);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn render_location(template: &str, is_auto: bool) -> String {
+        let mut context = Context::new();
+        context.insert("date_str", "2026-11-13");
+        context.insert("city", "Tokyo");
+        context.insert("region_name", "Tokyo");
+        context.insert("location_is_auto", &is_auto);
+        context.insert("display_order", &vec!["Location"]);
+        Tera::one_off(template, &context, false).unwrap()
+    }
+
+    #[test]
+    fn location_label_depends_on_selection() {
+        let ja = include_str!("../templates/ja.tera");
+        assert!(render_location(ja, true).contains("- 場所 (Current IP Address): Tokyo (Tokyo)"));
+        assert!(render_location(ja, false).contains("- 場所: Tokyo (Tokyo)"));
+
+        let en = include_str!("../templates/en.tera");
+        assert!(
+            render_location(en, true).contains("- Location (Current IP Address): Tokyo (Tokyo)")
+        );
+        assert!(render_location(en, false).contains("- Location: Tokyo (Tokyo)"));
+    }
 }

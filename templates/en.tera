@@ -1,7 +1,7 @@
 ## {{ date_str }}
 {% for item in display_order -%}
 {% if item == "Location" -%}
-- Location (Current IP Address): {{ city }} ({{ region_name }})
+- Location{% if location_is_auto %} (Current IP Address){% endif %}: {{ city }} ({{ region_name }})
 {% elif item == "Coordinates" -%}
 - Lat/Lon: ({{ lat }}, {{ lon }})
 {% elif item == "Timezone" -%}

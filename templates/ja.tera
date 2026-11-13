@@ -1,7 +1,7 @@
 ## {{ date_str }}
 {% for item in display_order -%}
 {% if item == "Location" -%}
-- 場所 (Current IP Address): {{ city }} ({{ region_name }})
+- 場所{% if location_is_auto %} (Current IP Address){% endif %}: {{ city }} ({{ region_name }})
 {% elif item == "Coordinates" -%}
 - 緯度経度: ({{ lat }}, {{ lon }})
 {% elif item == "Timezone" -%}
