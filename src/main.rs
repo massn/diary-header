@@ -1,4 +1,5 @@
 mod sleep;
+mod spinner;
 
 use chrono::{DateTime, Local, NaiveDate};
 use clap::{Parser, Subcommand};
@@ -518,7 +519,7 @@ fn get_geo_info_from_selection(
     selected_loc: &LocationChoice,
 ) -> Result<GeoInfo, Box<dyn std::error::Error>> {
     if selected_loc.is_auto {
-        return fetch_geo_info().or_else(|_| {
+        return spinner::with_spinner("Fetching location...", fetch_geo_info).or_else(|_| {
             Ok(GeoInfo {
                 status: "fail".to_string(),
                 city: "Unknown".to_string(),
@@ -601,7 +602,10 @@ fn fetch_sleep_if_needed(
             return None;
         }
     };
-    match sleep::fetch_sleep(gh, &token_path, today) {
+    let result = spinner::with_spinner("Fetching sleep data...", || {
+        sleep::fetch_sleep(gh, &token_path, today)
+    });
+    match result {
         Ok(Some(b)) => Some(b),
         Ok(None) => {
             eprintln!("Warning: No sleep data found for the night before {today}.");
@@ -631,7 +635,10 @@ fn collect_diary_data(
         .with_timezone(&Local);
 
     let (temp_max, temp_min, weather_code, precip_prob) =
-        fetch_weather_info(geo.lat, geo.lon, today).unwrap_or((0.0, 0.0, 0, None));
+        spinner::with_spinner("Fetching weather...", || {
+            fetch_weather_info(geo.lat, geo.lon, today)
+        })
+        .unwrap_or((0.0, 0.0, 0, None));
 
     let eto = get_sexagenary_cycle(today);
     let rokuyo = get_rokuyo(today, &config.language);
