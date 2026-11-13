@@ -20,5 +20,7 @@
 - Sexagenary Cycle: {{ eto }}
 {% elif item == "Rokuyo" -%}
 - Rokuyo: {{ rokuyo }}
+{% elif item == "Sleep" -%}
+- Sleep: {{ sleep }}
 {% endif -%}
 {% endfor -%}

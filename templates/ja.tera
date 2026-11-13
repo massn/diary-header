@@ -20,5 +20,7 @@
 - 干支: {{ eto }}
 {% elif item == "Rokuyo" -%}
 - 六曜: {{ rokuyo }}
+{% elif item == "Sleep" -%}
+- 睡眠: {{ sleep }}
 {% endif -%}
 {% endfor -%}

@@ -1,6 +1,8 @@
+mod sleep;
+
 use chrono::{DateTime, Local, NaiveDate};
 use clap::{Parser, Subcommand};
-use inquire::{Confirm, DateSelect, MultiSelect, Select};
+use inquire::{Confirm, DateSelect, MultiSelect, Select, Text};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
@@ -22,6 +24,7 @@ enum DisplayItem {
     Temperature,
     SexagenaryCycle,
     Rokuyo,
+    Sleep,
 }
 
 impl fmt::Display for DisplayItem {
@@ -37,6 +40,7 @@ impl fmt::Display for DisplayItem {
             DisplayItem::Temperature => "Temperature (気温)",
             DisplayItem::SexagenaryCycle => "Sexagenary Cycle (干支)",
             DisplayItem::Rokuyo => "Rokuyo (六曜)",
+            DisplayItem::Sleep => "Sleep (睡眠)",
         };
         write!(f, "{}", s)
     }
@@ -47,6 +51,8 @@ struct Config {
     language: String,
     #[serde(default = "default_display_order")]
     display_order: Vec<DisplayItem>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    google_health: Option<sleep::GoogleHealthConfig>,
 }
 
 fn default_display_order() -> Vec<DisplayItem> {
@@ -61,6 +67,7 @@ fn default_display_order() -> Vec<DisplayItem> {
         DisplayItem::Temperature,
         DisplayItem::SexagenaryCycle,
         DisplayItem::Rokuyo,
+        DisplayItem::Sleep,
     ]
 }
 
@@ -79,6 +86,8 @@ struct Cli {
 enum Commands {
     /// Update configuration
     Config,
+    /// Authorize access to Google Health API (for sleep data)
+    Auth,
 }
 
 #[derive(Deserialize, Debug)]
@@ -340,6 +349,7 @@ fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
         DisplayItem::Temperature,
         DisplayItem::SexagenaryCycle,
         DisplayItem::Rokuyo,
+        DisplayItem::Sleep,
     ];
 
     let selected_items = MultiSelect::new(
@@ -378,6 +388,7 @@ fn prompt_for_config() -> Result<Config, Box<dyn std::error::Error>> {
     Ok(Config {
         language,
         display_order,
+        google_health: None,
     })
 }
 
@@ -405,7 +416,12 @@ fn get_config_path(custom_path: Option<PathBuf>) -> Result<PathBuf, Box<dyn std:
 
 fn handle_config_command(config_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     println!("Updating configuration...");
-    let new_config = prompt_for_config()?;
+    let mut new_config = prompt_for_config()?;
+    // Keep existing Google Health credentials
+    if config_path.exists() {
+        let old: Config = toml::from_str(&fs::read_to_string(config_path)?)?;
+        new_config.google_health = old.google_health;
+    }
     let toml_string = toml::to_string(&new_config)?;
     fs::write(config_path, toml_string)?;
     println!(
@@ -413,6 +429,32 @@ fn handle_config_command(config_path: &PathBuf) -> Result<(), Box<dyn std::error
         config_path.display()
     );
     Ok(())
+}
+
+fn handle_auth_command(config_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let mut config = load_or_create_config(config_path)?;
+
+    let gh = match config.google_health.clone() {
+        Some(gh) => gh,
+        None => {
+            eprintln!(
+                "Create an OAuth client ID (type: Desktop app) in Google Cloud Console \
+                 with the Google Health API enabled, then enter its credentials."
+            );
+            let client_id = Text::new("OAuth client ID:").prompt()?;
+            let client_secret = Text::new("OAuth client secret:").prompt()?;
+            let gh = sleep::GoogleHealthConfig {
+                client_id: client_id.trim().to_string(),
+                client_secret: client_secret.trim().to_string(),
+            };
+            config.google_health = Some(gh.clone());
+            fs::write(config_path, toml::to_string(&config)?)?;
+            eprintln!("Saved credentials to: {}", config_path.display());
+            gh
+        }
+    };
+
+    sleep::run_auth_flow(&gh, &sleep::token_path(config_path))
 }
 
 fn load_or_create_config(config_path: &PathBuf) -> Result<Config, Box<dyn std::error::Error>> {
@@ -517,12 +559,65 @@ struct DiaryData {
     precip_prob: Option<i32>,
     eto: String,
     rokuyo: String,
+    sleep: Option<sleep::SleepBreakdown>,
+}
+
+fn print_sleep_auth_guide(lang: &str, config_path: &std::path::Path) {
+    if lang == "en" {
+        eprintln!(
+            "Warning: Sleep data is not shown because Google Health API is not authorized yet.\n\
+             To show sleep data:\n\
+             \x20 1. In Google Cloud Console, enable the Google Health API and create an OAuth client ID (type: Desktop app).\n\
+             \x20 2. Run `diary-header auth`, enter the client ID and secret, and allow access in your browser.\n\
+             To hide this item instead, remove \"sleep\" from display_order in {}",
+            config_path.display()
+        );
+    } else {
+        eprintln!(
+            "警告: Google Health API が未認証のため、睡眠データを表示できません。\n\
+             睡眠を表示するには:\n\
+             \x20 1. Google Cloud Console で Google Health API を有効にし、OAuth クライアント ID（種類: デスクトップアプリ）を作成する\n\
+             \x20 2. `diary-header auth` を実行し、クライアント ID とシークレットを入力してブラウザでアクセスを許可する\n\
+             睡眠を表示しない場合は、{} の display_order から \"sleep\" を削除してください。",
+            config_path.display()
+        );
+    }
+}
+
+fn fetch_sleep_if_needed(
+    today: NaiveDate,
+    config: &Config,
+    config_path: &std::path::Path,
+) -> Option<sleep::SleepBreakdown> {
+    if !config.display_order.contains(&DisplayItem::Sleep) {
+        return None;
+    }
+    let token_path = sleep::token_path(config_path);
+    let gh = match config.google_health.as_ref() {
+        Some(gh) if token_path.exists() => gh,
+        _ => {
+            print_sleep_auth_guide(&config.language, config_path);
+            return None;
+        }
+    };
+    match sleep::fetch_sleep(gh, &token_path, today) {
+        Ok(Some(b)) => Some(b),
+        Ok(None) => {
+            eprintln!("Warning: No sleep data found for the night before {today}.");
+            None
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to fetch sleep data: {e}");
+            None
+        }
+    }
 }
 
 fn collect_diary_data(
     geo: GeoInfo,
     today: NaiveDate,
     config: &Config,
+    config_path: &std::path::Path,
 ) -> Result<DiaryData, Box<dyn std::error::Error>> {
     let coord = sunrise::Coordinates::new(geo.lat, geo.lon).ok_or("Invalid coordinates")?;
     let solar_day = sunrise::SolarDay::new(coord, today);
@@ -538,6 +633,7 @@ fn collect_diary_data(
 
     let eto = get_sexagenary_cycle(today);
     let rokuyo = get_rokuyo(today, &config.language);
+    let sleep = fetch_sleep_if_needed(today, config, config_path);
 
     Ok(DiaryData {
         geo,
@@ -549,6 +645,7 @@ fn collect_diary_data(
         precip_prob,
         eto,
         rokuyo,
+        sleep,
     })
 }
 
@@ -634,6 +731,11 @@ fn generate_header(
     context.insert("temp_min", &format!("{:.1}", data.temp_min));
     context.insert("eto", &data.eto);
     context.insert("rokuyo", &data.rokuyo);
+    let sleep_str = match &data.sleep {
+        Some(b) => sleep::format_breakdown(b, &config.language),
+        None => "N/A".to_string(),
+    };
+    context.insert("sleep", &sleep_str);
 
     // Convert display_order to string names for template
     let display_order_names: Vec<String> = config
@@ -651,15 +753,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let config_path = get_config_path(cli.config.clone())?;
 
-    if let Some(Commands::Config) = &cli.command {
-        return handle_config_command(&config_path);
+    match &cli.command {
+        Some(Commands::Config) => return handle_config_command(&config_path),
+        Some(Commands::Auth) => return handle_auth_command(&config_path),
+        None => {}
     }
 
     let config = load_or_create_config(&config_path)?;
     let today = select_date()?;
     let selected_loc = select_location()?;
     let geo = get_geo_info_from_selection(&selected_loc)?;
-    let data = collect_diary_data(geo, today, &config)?;
+    let data = collect_diary_data(geo, today, &config, &config_path)?;
     let header = generate_header(today, &data, &config)?;
 
     println!("{}", header);

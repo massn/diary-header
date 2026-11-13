@@ -11,6 +11,7 @@ A command-line tool written in Rust that interactively generates a Markdown head
 - **Weather Information**: Retrieves daily maximum and minimum temperatures for the selected date and location.
 - **Sexagenary Cycle (干支)**: Automatically computes the traditional continuous calendar cycle (Eto) for the given date.
 - **Six-Day Cycle (六曜)**: Calculates the traditional Japanese six-day cycle (Rokuyo) for fortune-telling and event planning.
+- **Sleep Breakdown**: Shows last night's sleep stages (total sleep time, deep, light, REM, time to fall asleep, awake) fetched from the [Google Health API](https://developers.google.com/health).
 - **Language Configuration**: Choose between Japanese (ja) and English (en) for the output format.
 - **Customizable Display Order**: Configure which information to display and in what order via the config file.
 - **Persistent Configuration**: Prompts for an initial configuration (language) and saves it to a configuration file (`~/.config/diary-header/config.toml`). You can update this later using the `config` subcommand.
@@ -68,6 +69,7 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - 気温: 最高 18.5°C / 最低 12.3°C
 - 干支: 甲辰
 - 六曜: 先勝
+- 睡眠: 合計 6時間46分 / 深い 1時間54分 / 浅い 3時間18分 / レム 1時間34分 / 寝付けず 0分 / 覚醒 56分
 ```
 
 **English Output (`en`):**
@@ -83,6 +85,7 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - Temperature: Max 18.5°C / Min 12.3°C
 - Sexagenary Cycle: 甲辰
 - Rokuyo: 先勝
+- Sleep: Total 6h46m / Deep 1h54m / Light 3h18m / REM 1h34m / Falling asleep 0m / Awake 56m
 ```
 
 You can redirect this output directly to your diary file or copy it securely:
@@ -122,6 +125,7 @@ display_order = [
     "temperature",
     "sexagenary_cycle",
     "rokuyo",
+    "sleep",
 ]
 ```
 
@@ -136,6 +140,7 @@ display_order = [
 - `temperature` - Max/min temperature
 - `sexagenary_cycle` - Sexagenary cycle (干支)
 - `rokuyo` - Six-day cycle (六曜)
+- `sleep` - Last night's sleep breakdown (requires Google Health API setup, see below)
 
 You can reorder these items or remove items you don't need. For example, to show only weather-related information:
 
@@ -149,6 +154,29 @@ display_order = [
 ```
 
 Items not included in `display_order` will not be displayed in the output.
+
+### Sleep Data (Google Health API)
+
+The `sleep` item shows the main sleep session that ended on the selected date (i.e. the night before), with the total time asleep (light + deep + REM, from `minutesAsleep`) followed by deep / light / REM / time to fall asleep / awake.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), enable the **Google Health API** and create an OAuth client ID of type **Desktop app**.
+2. Run the `auth` subcommand, enter the client ID and secret, and open the printed URL to grant the `googlehealth.sleep.readonly` scope:
+   ```bash
+   diary-header auth
+   ```
+   The credentials are saved to `config.toml` (`[google_health]` section) and the refresh token to `google_health_token.json` in the same directory.
+3. Make sure `"sleep"` is in `display_order`.
+
+If sleep data cannot be fetched, a warning is printed to stderr and the item shows `N/A`.
+
+**Note:** "Time to fall asleep" (寝付けず) is taken from `minutesToFallAsleep`, which the Google Health API reports as `0` for automatically detected sleep. It only has a non-zero value when the sleep log has been manually edited, so it will usually show `0`.
+
+**Upgrading from an older version:** templates are copied to `~/.config/diary-header/templates/` only on first run. Add the following before `{% endif -%}` in your `ja.tera` / `en.tera` (or delete the templates directory to regenerate it):
+
+```
+{% elif item == "Sleep" -%}
+- 睡眠: {{ sleep }}
+```
 
 ## Dependencies
 
