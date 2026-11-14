@@ -481,7 +481,7 @@ pub fn format_breakdown(b: &SleepBreakdown, lang: &str) -> String {
     let values = [b.deep, b.light, b.rem, b.to_fall_asleep, b.awake];
     let mut out = summary.join(" / ");
     for (label, v) in labels.iter().zip(values) {
-        out.push_str(&format!("\n  - {} {}", label, format_minutes(v, lang)));
+        out.push_str(&format!("\n\t- {} {}", label, format_minutes(v, lang)));
     }
     out
 }
@@ -583,11 +583,11 @@ mod tests {
         };
         assert_eq!(
             format_breakdown(&b, "ja"),
-            "23:12〜06:58 / 合計 6時間46分\n  - 深い 1時間54分\n  - 浅い 3時間18分\n  - レム 1時間34分\n  - 寝付けず 0分\n  - 覚醒 56分"
+            "23:12〜06:58 / 合計 6時間46分\n\t- 深い 1時間54分\n\t- 浅い 3時間18分\n\t- レム 1時間34分\n\t- 寝付けず 0分\n\t- 覚醒 56分"
         );
         assert_eq!(
             format_breakdown(&b, "en"),
-            "23:12-06:58 / Total 6h46m\n  - Deep 1h54m\n  - Light 3h18m\n  - REM 1h34m\n  - Falling asleep 0m\n  - Awake 56m"
+            "23:12-06:58 / Total 6h46m\n\t- Deep 1h54m\n\t- Light 3h18m\n\t- REM 1h34m\n\t- Falling asleep 0m\n\t- Awake 56m"
         );
         // The time range is omitted when the interval is unavailable
         b.start = None;

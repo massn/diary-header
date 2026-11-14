@@ -70,11 +70,11 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - 干支: 甲辰
 - 六曜: 先勝
 - 睡眠: 23:12〜06:58 / 合計 6時間46分
-  - 深い 1時間54分
-  - 浅い 3時間18分
-  - レム 1時間34分
-  - 寝付けず 0分
-  - 覚醒 56分
+	- 深い 1時間54分
+	- 浅い 3時間18分
+	- レム 1時間34分
+	- 寝付けず 0分
+	- 覚醒 56分
 ```
 
 **English Output (`en`):**
@@ -91,11 +91,11 @@ Once the selections are made, the tool outputs a localized Markdown header depen
 - Sexagenary Cycle: 甲辰
 - Rokuyo: 先勝
 - Sleep: 23:12-06:58 / Total 6h46m
-  - Deep 1h54m
-  - Light 3h18m
-  - REM 1h34m
-  - Falling asleep 0m
-  - Awake 56m
+	- Deep 1h54m
+	- Light 3h18m
+	- REM 1h34m
+	- Falling asleep 0m
+	- Awake 56m
 ```
 
 You can redirect this output directly to your diary file or copy it securely:
