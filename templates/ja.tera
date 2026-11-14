@@ -21,6 +21,9 @@
 {% elif item == "Rokuyo" -%}
 - 六曜: {{ rokuyo }}
 {% elif item == "Sleep" -%}
-- 睡眠: {{ sleep }}
+- 睡眠: {{ sleep_summary }}
+{%- for stage in sleep_stages %}
+	- {{ stage.label }} {{ stage.value }}
+{%- endfor %}
 {% endif -%}
 {% endfor -%}

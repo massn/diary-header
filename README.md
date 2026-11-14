@@ -185,8 +185,17 @@ If sleep data cannot be fetched, a warning is printed to stderr and the item sho
 
 ```
 {% elif item == "Sleep" -%}
-- 睡眠: {{ sleep }}
+- 睡眠: {{ sleep_summary }}
+{%- for stage in sleep_stages %}
+	- {{ stage.label }} {{ stage.value }}
+{%- endfor %}
 ```
+
+**Customizing the sleep format:** the following variables are available in templates, so you can change the indentation (tab, spaces, etc.) or layout of the stage breakdown freely:
+
+- `sleep_summary` - First line: bedtime/wake-up time and total sleep time (`N/A` when unavailable)
+- `sleep_stages` - List of stages, each with `label` (e.g. `深い` / `Deep`) and `value` (e.g. `1時間54分` / `1h54m`); empty when unavailable
+- `sleep` - Everything as a single pre-formatted string (summary plus tab-indented sub-list), kept for older templates
 
 ## Dependencies
 

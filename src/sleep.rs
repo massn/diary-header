@@ -455,16 +455,16 @@ fn format_minutes(minutes: i64, lang: &str) -> String {
     }
 }
 
-/// Formats the sleep data for the diary header.
-///
-/// The first line holds the time range and total sleep time; the stage
-/// breakdown follows as an indented Markdown sub-list.
-pub fn format_breakdown(b: &SleepBreakdown, lang: &str) -> String {
-    let (total_label, labels) = if lang == "en" {
-        ("Total", ["Deep", "Light", "REM", "Falling asleep", "Awake"])
-    } else {
-        ("合計", ["深い", "浅い", "レム", "寝付けず", "覚醒"])
-    };
+/// One row of the stage breakdown, exposed to templates as `sleep_stages`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct StageItem {
+    pub label: String,
+    pub value: String,
+}
+
+/// Formats the first line: the time range (when available) and total sleep time.
+pub fn format_summary(b: &SleepBreakdown, lang: &str) -> String {
+    let total_label = if lang == "en" { "Total" } else { "合計" };
 
     let mut summary: Vec<String> = Vec::new();
     if let (Some(start), Some(end)) = (b.start, b.end) {
@@ -477,11 +477,35 @@ pub fn format_breakdown(b: &SleepBreakdown, lang: &str) -> String {
         ));
     }
     summary.push(format!("{} {}", total_label, format_minutes(b.total, lang)));
+    summary.join(" / ")
+}
 
+/// Returns the stage breakdown (deep, light, REM, time to fall asleep, awake).
+pub fn stage_items(b: &SleepBreakdown, lang: &str) -> Vec<StageItem> {
+    let labels = if lang == "en" {
+        ["Deep", "Light", "REM", "Falling asleep", "Awake"]
+    } else {
+        ["深い", "浅い", "レム", "寝付けず", "覚醒"]
+    };
     let values = [b.deep, b.light, b.rem, b.to_fall_asleep, b.awake];
-    let mut out = summary.join(" / ");
-    for (label, v) in labels.iter().zip(values) {
-        out.push_str(&format!("\n\t- {} {}", label, format_minutes(v, lang)));
+    labels
+        .iter()
+        .zip(values)
+        .map(|(label, v)| StageItem {
+            label: label.to_string(),
+            value: format_minutes(v, lang),
+        })
+        .collect()
+}
+
+/// Formats the sleep data as a single string (`{{ sleep }}` in templates).
+///
+/// The first line holds the time range and total sleep time; the stage
+/// breakdown follows as a tab-indented Markdown sub-list.
+pub fn format_breakdown(b: &SleepBreakdown, lang: &str) -> String {
+    let mut out = format_summary(b, lang);
+    for item in stage_items(b, lang) {
+        out.push_str(&format!("\n\t- {} {}", item.label, item.value));
     }
     out
 }

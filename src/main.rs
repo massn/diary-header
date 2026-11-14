@@ -747,6 +747,15 @@ fn generate_header(
         None => "N/A".to_string(),
     };
     context.insert("sleep", &sleep_str);
+    let (sleep_summary, sleep_stages) = match &data.sleep {
+        Some(b) => (
+            sleep::format_summary(b, &config.language),
+            sleep::stage_items(b, &config.language),
+        ),
+        None => ("N/A".to_string(), Vec::new()),
+    };
+    context.insert("sleep_summary", &sleep_summary);
+    context.insert("sleep_stages", &sleep_stages);
 
     // Convert display_order to string names for template
     let display_order_names: Vec<String> = config
@@ -807,5 +816,32 @@ mod tests {
             render_location(en, true).contains("- Location (Current IP Address): Tokyo (Tokyo)")
         );
         assert!(render_location(en, false).contains("- Location: Tokyo (Tokyo)"));
+    }
+
+    #[test]
+    fn sleep_stages_are_rendered_by_template() {
+        let b = sleep::SleepBreakdown {
+            total: 406,
+            deep: 114,
+            light: 198,
+            rem: 94,
+            to_fall_asleep: 0,
+            awake: 56,
+            ..Default::default()
+        };
+        let mut context = Context::new();
+        context.insert("date_str", "2026-11-13");
+        context.insert("display_order", &vec!["Sleep"]);
+        context.insert("sleep_summary", &sleep::format_summary(&b, "ja"));
+        context.insert("sleep_stages", &sleep::stage_items(&b, "ja"));
+        let out = Tera::one_off(include_str!("../templates/ja.tera"), &context, false).unwrap();
+        assert!(out.contains("- 睡眠: 合計 6時間46分\n\t- 深い 1時間54分\n\t- 浅い 3時間18分\n"));
+        assert!(out.ends_with("\t- 覚醒 56分\n"));
+
+        // Without sleep data only the summary line is shown
+        context.insert("sleep_summary", "N/A");
+        context.insert("sleep_stages", &Vec::<sleep::StageItem>::new());
+        let out = Tera::one_off(include_str!("../templates/ja.tera"), &context, false).unwrap();
+        assert!(out.ends_with("- 睡眠: N/A\n"));
     }
 }

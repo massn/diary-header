@@ -21,6 +21,9 @@
 {% elif item == "Rokuyo" -%}
 - Rokuyo: {{ rokuyo }}
 {% elif item == "Sleep" -%}
-- Sleep: {{ sleep }}
+- Sleep: {{ sleep_summary }}
+{%- for stage in sleep_stages %}
+	- {{ stage.label }} {{ stage.value }}
+{%- endfor %}
 {% endif -%}
 {% endfor -%}
